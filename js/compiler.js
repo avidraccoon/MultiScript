@@ -571,6 +571,7 @@ class Tokens {
   static WHILE_TOKEN = 7;
   static FOR_TOKEN = 8;
   static SPACE_TOKEN = 9;
+  static STRING_TOKEN = 10;
 }
 
 class TokenResponse {
@@ -587,7 +588,6 @@ class TokenMatch {
     this.level = level;
     this.pattern = pattern;
     this.match = match;
-    this.position = match.index+offset;
   }
 }
 
@@ -606,31 +606,63 @@ class TokenPattern {
     const keys = Array.from(this.Patterns.keys());
     const patterns = keys.map((key) => this.Patterns.get(key));
     patterns.sort((a, b) => a.level-b.level);
+    const matches = [];
+    let ignore_terminating = false;
     for (let i = 0; i < patterns.length; i++) {
       const pattern = patterns[i];
-      const match = pattern.pattern.exec(text);
-      if (match){
-        if (end_of_line || match[0].length < text.length || pattern.terminating){
+      let match;
+      if (pattern.conditional_pattern){
+        match = pattern.conditional_pattern.exec(text);
+      }else{
+        match = pattern.pattern.exec(text);
+      }
+      if (match) {
+        if (pattern.conditional_pattern){
+          match = pattern.pattern.exec(text);
+        }
+        console.log(pattern.pattern, (match)?match[0]:0, ignore_terminating, text)
+        //console.log(pattern.terminating, !ignore_terminating, (pattern.terminating && !ignore_terminating))
+        if (pattern.terminating && matches.length > 0){
+          for (let prev of matches){
+            let prev_match = prev.pattern.pattern.exec(text);
+            if (prev_match) {
+              return new TokenResponse(true, prev_match[0].length, new Token(prev.pattern.type), prev_match[0]);
+            }
+          }
+        }
+        if (match && (end_of_line || (match[0].length < text.length && matches.length === 0) || (pattern.terminating && !ignore_terminating) || pattern.bypass_ignore)) {
           return new TokenResponse(true, match[0].length, new Token(pattern.type), match[0]);
+        }else{
+          matches.push(new TokenMatch(pattern.level, pattern, match, 0));
+          if (pattern.ignore_terminating){
+            ignore_terminating = true;
+          }
         }
       }
     }
     return new TokenResponse();
   }
 
-  constructor(type, pattern = new RegExp(""), level = 999, terminating = true) {
+  constructor(type, pattern = new RegExp(""), level = 999, terminating = false, ignore_terminating = false, bypass_ignore = false, conditional_pattern) {
     this.pattern = pattern;
     this.level = level;
     this.terminating = terminating;
+    this.conditional_pattern = conditional_pattern;
+    this.ignore_terminating = ignore_terminating;
+    this.bypass_ignore = bypass_ignore;
     this.type = type;
   }
 }
+// Token Pattern Definition
 TokenPattern.setPattern(Tokens.IDENTITY_TOKEN,
-  new TokenPattern(Tokens.IDENTITY_TOKEN, /\w+/, 9, false));
-TokenPattern.setPattern(Tokens.SPACE_TOKEN,
-  new TokenPattern(Tokens.SPACE_TOKEN, / /));
+  new TokenPattern(Tokens.IDENTITY_TOKEN, /\w+/, 10));
 TokenPattern.setPattern(Tokens.RETURN_TOKEN,
-  new TokenPattern(Tokens.RETURN_TOKEN, /return/));
+  new TokenPattern(Tokens.RETURN_TOKEN, /return/, 9));
+TokenPattern.setPattern(Tokens.SPACE_TOKEN,
+  new TokenPattern(Tokens.SPACE_TOKEN, / /, 11, true));
+TokenPattern.setPattern(Tokens.STRING_TOKEN,
+  new TokenPattern(Tokens.STRING_TOKEN, /".+"/, 5, true, true, true, /".+/));
+
 console.log(TokenPattern.getPattern(Tokens.IDENTITY_TOKEN));
 
 class TokenList {
@@ -700,7 +732,7 @@ class Lexer{
     let response;
     do {
       response = TokenPattern.getMatchingPattern(remaining_text, end_of_line);
-      //console.log(response)
+      console.log(response)
       if (response.hasToken){
         const token = response.token;
         token.line_number = line_num;
