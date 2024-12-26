@@ -453,6 +453,20 @@ class VariableCreation extends Code{
   }
 }
 
+class VariableCreationAndAssignment extends Code{
+  constructor(variableName, statement) {
+    super();
+    this.variableName = variableName;
+    this.statement = statement;
+  }
+
+  execute(context) {
+    context.createVariable(this.variableName);
+    context.setVariable(this.variableName, this.statement.evaluate(context));
+    return new ReturnToken(ReturnToken.None);
+  }
+}
+
 class IfStatement extends Code{
 
   constructor(statement, code_block, else_statement) {
@@ -576,6 +590,10 @@ class Tokens {
   static L_PAREN_TOKEN = 12;
   static R_PAREN_TOKEN = 13;
   static COMMENT_TOKEN = 14;
+  static VARIABLE_CREATION_TOKEN = 14;
+  static CATCH_TOKEN = 15;
+  static L_BRACKET_TOKEN = 16;
+  static R_BRACKET_TOKEN = 17;
 }
 
 class TokenResponse {
@@ -655,6 +673,16 @@ TokenPattern.setPattern(Tokens.IDENTITY_TOKEN,
   new TokenPattern(Tokens.IDENTITY_TOKEN, /\w+/, 10));
 TokenPattern.setPattern(Tokens.RETURN_TOKEN,
   new TokenPattern(Tokens.RETURN_TOKEN, /return/, 9));
+TokenPattern.setPattern(Tokens.IF_TOKEN,
+  new TokenPattern(Tokens.IF_TOKEN, /if/, 9));
+TokenPattern.setPattern(Tokens.ELSE_TOKEN,
+  new TokenPattern(Tokens.ELSE_TOKEN, /else/, 9));
+TokenPattern.setPattern(Tokens.WHILE_TOKEN,
+  new TokenPattern(Tokens.WHILE_TOKEN, /while/, 9));
+TokenPattern.setPattern(Tokens.FOR_TOKEN,
+  new TokenPattern(Tokens.FOR_TOKEN, /for/, 9));
+TokenPattern.setPattern(Tokens.VARIABLE_CREATION_TOKEN,
+  new TokenPattern(Tokens.VARIABLE_CREATION_TOKEN, /var/, 9));
 TokenPattern.setPattern(Tokens.SPACE_TOKEN,
   new TokenPattern(Tokens.SPACE_TOKEN, / /, 11));
 TokenPattern.setPattern(Tokens.STRING_TOKEN,
@@ -667,6 +695,8 @@ TokenPattern.setPattern(Tokens.R_PAREN_TOKEN,
   new TokenPattern(Tokens.R_PAREN_TOKEN, /\)/, 2));
 TokenPattern.setPattern(Tokens.COMMENT_TOKEN,
   new TokenPattern(Tokens.COMMENT_TOKEN, /\/\/.*/, 0));
+TokenPattern.setPattern(Tokens.CATCH_TOKEN,
+  new TokenPattern(Tokens.CATCH_TOKEN, /./, 999));
 
 console.log(TokenPattern.getPattern(Tokens.IDENTITY_TOKEN));
 
@@ -678,11 +708,15 @@ class TokenList {
     }
   }
 
+  hasToken(){
+    return this.tokens.length > 0;
+  }
+
   addToken(token){
     this.tokens.push(token);
   }
 
-  startParsing(){
+  reverseTokens(){
     this.tokens.reverse();
   }
 
@@ -723,6 +757,26 @@ class TokenList {
       }
     }
     return -1;
+  }
+
+  consumeTillNext(tokenType){
+    this.consumeTokens(this.distanceToNext(tokenType));
+  }
+
+  consumeNext(tokenType){
+    this.consumeTokens(this.distanceToNext(tokenType)+1);
+  }
+
+  getTillNext(tokenType){
+    return this.getToken(this.distanceToNext(tokenType));
+  }
+
+  getNext(tokenType){
+    return this.getToken(this.distanceToNext(tokenType)+1);
+  }
+
+  containsToken(tokenType){
+    return (this.distanceToNext(tokenType) !== -1);
   }
 }
 
@@ -768,7 +822,148 @@ class Lexer{
   }
 }
 
+class TokenMergePattern{
+  static Patterns = new Map();
+  static defaultPattern = new TokenMergePattern();
+
+  static setPattern(token_type, pattern){
+    this.Patterns.set(token_type, pattern);
+  }
+
+  static getPattern(token_type){
+    const pattern = this.Patterns.get(token_type);
+    if (pattern){
+      return pattern;
+    }else{
+      return this.defaultPattern;
+    }
+  }
+
+  constructor(merge_function){
+    if (merge_function) {
+      this.merge_function = merge_function;
+    }else{
+      this.merge_function = (tokens, merged_tokens) => {
+        merged_tokens.addToken(tokens.getToken());
+      }
+    }
+  }
+
+  merge(tokens, merged_tokens){
+    this.merge_function(tokens, merged_tokens);
+  }
+}
+
+class TokenMerger{
+  merge(tokens){
+    tokens.reverse();
+    let merged_tokens = new TokenList();
+    while (tokens.hasToken(tokens)){
+      const pattern = TokenMergePattern.getPattern(tokens.peek().type);
+      pattern.merge(tokens, merged_tokens);
+    }
+  }
+}
+
+class Statements{
+  static BASE_STATEMENT = 0;
+  static ADDITION_STATEMENT = 1;
+  static SUBTRACTION_STATEMENT = 2;
+  static MULTIPLICATION_STATEMENT = 3;
+  static DIVISION_STATEMENT = 4;
+  static EQUAL_STATEMENT = 5;
+  static LESS_STATEMENT = 6;
+  static GREATER_STATEMENT = 7;
+  static CODE_BLOCK = 10;
+  static IF_BLOCK = 11;
+  static ELSE_BLOCK = 12;
+  static FOR_BLOCK = 13;
+  static WHILE_BLOCK = 14;
+}
+
+class TokenStatementMap{
+  static tokenStatementMap = new Map();
+
+  static mapToken(token_type, statement_type){
+    this.tokenStatementMap.set(token_type, statement_type);
+  }
+
+  static getStatement(token_type){
+    return this.tokenStatementMap.get(token_type);
+    //TODO: add error on no statement found
+  }
+}
+
+TokenStatementMap.mapToken(Tokens.IF_TOKEN, Statements.IF_BLOCK);
+TokenStatementMap.mapToken(Tokens.ELSE_TOKEN, Statements.ELSE_BLOCK);
+TokenStatementMap.mapToken(Tokens.FOR_TOKEN, Statements.FOR_BLOCK);
+TokenStatementMap.mapToken(Tokens.WHILE_TOKEN, Statements.WHILE_BLOCK);
+
+class StatementCreators{
+  static Creators = new Map();
+
+  static setCreator(statement_type, creator){
+    this.Creators.set(statement_type, creator);
+  }
+
+  static getCreator(statement_type){
+    return this.Creators.get(statement_type);
+  }
+
+  static createStatement(statement_type, tokens){
+    return this.getCreator(statement_type).createStatement(tokens);
+  }
+}
+
+
+class StatementCreator{
+
+  createStatement(tokens){
+    const statement_type = TokenStatementMap.getStatement(tokens.peek().type);
+    const statement_constructor = StatementCreators.getCreator(statement_type);
+    return statement_constructor.createStatement(tokens);
+  }
+
+}
+
+class CodeBlockCreator extends StatementCreator{
+
+  createLine(tokens){
+    return StatementCreators.createStatement(Statements.BASE_STATEMENT, tokens);
+  }
+
+  createStatement(tokens){
+    const code_block = new CodeBlock();
+    //TODO add logic to make generate lines
+    tokens.consumeToken();
+    let next_token = tokens.peek()
+    while (next_token.type !== Tokens.R_BRACKET_TOKEN){
+      const line = this.createLine(tokens)
+      next_token = tokens.peek();
+    }
+    return code_block;
+  }
+
+}
+
+class IfBlockCreator extends StatementCreator{
+
+  createStatement(tokens){
+    //TODO: handle parenthesis and structure of if block;
+    tokens.consumeNext(Tokens.L_PAREN_TOKEN);
+    const condition = StatementCreators.createStatement(Statements.BASE_STATEMENT, tokens);
+    tokens.consumeTillNext(Tokens.L_BRACKET_TOKEN);
+    const code_block = StatementCreators.createStatement(Statements.CODE_BLOCK, tokens);
+    const if_block = new IfStatement();
+  }
+
+}
+
+StatementCreators.setCreator(Statements.BASE_STATEMENT, new StatementCreator());
+
+
 class Parser {
+
 }
 
 class Compiler {
