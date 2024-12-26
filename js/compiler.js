@@ -572,14 +572,19 @@ class Tokens {
   static FOR_TOKEN = 8;
   static SPACE_TOKEN = 9;
   static STRING_TOKEN = 10;
+  static EOL_TOKEN = 11;
+  static L_PAREN_TOKEN = 12;
+  static R_PAREN_TOKEN = 13;
+  static COMMENT_TOKEN = 14;
 }
 
 class TokenResponse {
-  constructor(hasToken=false, char_count=0, token, content) {
+  constructor(hasToken=false, char_count=0, token, content, index) {
     this.hasToken = hasToken;
     this.char_count = char_count;
     this.token = token;
     this.content = content;
+    this.index = index;
   }
 }
 
@@ -607,7 +612,6 @@ class TokenPattern {
     const patterns = keys.map((key) => this.Patterns.get(key));
     patterns.sort((a, b) => a.level-b.level);
     const matches = [];
-    let ignore_terminating = false;
     for (let i = 0; i < patterns.length; i++) {
       const pattern = patterns[i];
       let match;
@@ -620,36 +624,29 @@ class TokenPattern {
         if (pattern.conditional_pattern){
           match = pattern.pattern.exec(text);
         }
-        console.log(pattern.pattern, (match)?match[0]:0, ignore_terminating, text)
-        //console.log(pattern.terminating, !ignore_terminating, (pattern.terminating && !ignore_terminating))
-        if (pattern.terminating && matches.length > 0){
-          for (let prev of matches){
-            let prev_match = prev.pattern.pattern.exec(text);
-            if (prev_match) {
-              return new TokenResponse(true, prev_match[0].length, new Token(prev.pattern.type), prev_match[0]);
-            }
-          }
-        }
-        if (match && (end_of_line || (match[0].length < text.length && matches.length === 0) || (pattern.terminating && !ignore_terminating) || pattern.bypass_ignore)) {
-          return new TokenResponse(true, match[0].length, new Token(pattern.type), match[0]);
-        }else{
-          matches.push(new TokenMatch(pattern.level, pattern, match, 0));
-          if (pattern.ignore_terminating){
-            ignore_terminating = true;
-          }
+        if (match) {
+          const response = new TokenResponse(true, match[0].length, new Token(pattern.type), match[0], match.index);
+          matches.push(response);
         }
       }
+    }
+    matches.sort((a, b) => {
+      if (a.index < b.index) return -1;
+      if (a.index > b.index) return 1;
+      if (b.char_count < a.char_count) return -1;
+      if (b.char_count > a.char_count) return 1;
+      return a.level-b.level;
+    });
+    if (matches.length > 0) {
+      return matches[0];
     }
     return new TokenResponse();
   }
 
-  constructor(type, pattern = new RegExp(""), level = 999, terminating = false, ignore_terminating = false, bypass_ignore = false, conditional_pattern) {
+  constructor(type, pattern = new RegExp(""), level = 999, conditional_pattern) {
     this.pattern = pattern;
     this.level = level;
-    this.terminating = terminating;
     this.conditional_pattern = conditional_pattern;
-    this.ignore_terminating = ignore_terminating;
-    this.bypass_ignore = bypass_ignore;
     this.type = type;
   }
 }
@@ -659,9 +656,17 @@ TokenPattern.setPattern(Tokens.IDENTITY_TOKEN,
 TokenPattern.setPattern(Tokens.RETURN_TOKEN,
   new TokenPattern(Tokens.RETURN_TOKEN, /return/, 9));
 TokenPattern.setPattern(Tokens.SPACE_TOKEN,
-  new TokenPattern(Tokens.SPACE_TOKEN, / /, 11, true));
+  new TokenPattern(Tokens.SPACE_TOKEN, / /, 11));
 TokenPattern.setPattern(Tokens.STRING_TOKEN,
-  new TokenPattern(Tokens.STRING_TOKEN, /".+"/, 5, true, true, true, /".+/));
+  new TokenPattern(Tokens.STRING_TOKEN, /".+"/, 1, /".+/));
+TokenPattern.setPattern(Tokens.EOL_TOKEN,
+  new TokenPattern(Tokens.EOL_TOKEN, /;/, 2));
+TokenPattern.setPattern(Tokens.L_PAREN_TOKEN,
+  new TokenPattern(Tokens.L_PAREN_TOKEN, /\(/, 2));
+TokenPattern.setPattern(Tokens.R_PAREN_TOKEN,
+  new TokenPattern(Tokens.R_PAREN_TOKEN, /\)/, 2));
+TokenPattern.setPattern(Tokens.COMMENT_TOKEN,
+  new TokenPattern(Tokens.COMMENT_TOKEN, /\/\/.*/, 0));
 
 console.log(TokenPattern.getPattern(Tokens.IDENTITY_TOKEN));
 
@@ -727,16 +732,16 @@ class Lexer{
 
   }
 
-  handleTokenGeneration(tokens, text, line_num, character_num, end_of_line){
+  handleTokenGeneration(tokens, text, line_num, end_of_line){
     let remaining_text = text;
     let response;
+    const length = text.length;
     do {
       response = TokenPattern.getMatchingPattern(remaining_text, end_of_line);
-      console.log(response)
       if (response.hasToken){
         const token = response.token;
         token.line_number = line_num;
-        token.character_number = character_num-response.char_count+1;
+        token.character_number = length-remaining_text.length+1+response.index;
         token.content = response.content;
         tokens.addToken(token);
       }
@@ -753,12 +758,7 @@ class Lexer{
     for (let line of lines) {
       let character_number = 1;
       let current_text = "";
-      const line_length = line.length;
-      for (let char of line) {
-        current_text+=char;
-        current_text = this.handleTokenGeneration(tokens, current_text, line_number, character_number, character_number===line_length);
-        character_number++;
-      }
+      this.handleTokenGeneration(tokens, line, line_number, true);
       line_number++;
     }
     for (let token of tokens.tokens){
