@@ -38,6 +38,7 @@ codeBlock.addLine(variable);
 codeBlock.addLine(whileLoop)
 codeBlock.addLine(endValuePrint);
 
-codeBlock.execute(context);
+//codeBlock.execute(context);
 //console.log(context.getVariable("test"));
 
+document.getElementById("code").value ="var test = 0;\nvar test1 = 1;\nprintln test + test1;"

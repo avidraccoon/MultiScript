@@ -1,4 +1,8 @@
-
+//TODO add concept of objects
+//TODO add arrays
+//TODO add classes
+const debug = false;
+const debug_token = false;
 class Output{
 
   clear(){
@@ -70,16 +74,23 @@ class Scope{
   }
 
 }
-
+/*TODO redo scope handling to allow methods to work
+Potential Fix is to give methods there own scope handler and to make them extend scope
+*/
 class ScopeHandler{
 
   constructor(){
     this.scopes = [new Scope()]
+    this.currentScope = -1;
   }
 
   getMethod(methodName) {
     let method = undefined;
-    for (let i=0; i<this.scopes.length; i++) {
+    let scope = this.scopes.length-1;
+    if (this.currentScope !== -1){
+      scope = this.currentScope;
+    }
+    for (let i=scope; i>=0; i--) {
       method = this.scopes[i].getMethod(methodName);
       if (method) return method;
     }
@@ -89,7 +100,11 @@ class ScopeHandler{
 
   getVariable(methodName) {
     let variable = undefined;
-    for (let i=0; i<this.scopes.length; i++) {
+    let scope = this.scopes.length-1;
+    if (this.currentScope !== -1){
+      scope = this.currentScope;
+    }
+    for (let i=scope; i>=0; i--) {
       variable = this.scopes[i].getVariable(methodName);
       if (variable) return variable;
     }
@@ -98,7 +113,11 @@ class ScopeHandler{
   }
 
   setVariable(variableName, variableValue) {
-    for (let i=0; i<this.scopes.length; i++) {
+    let scope = this.scopes.length-1;
+    if (this.currentScope !== -1){
+      scope = this.currentScope;
+    }
+    for (let i=scope; i>=0; i--) {
       if (this.scopes[i].hasVariable(variableName)) {
         this.scopes[i].setVariable(variableName, variableValue);
         return;
@@ -108,15 +127,33 @@ class ScopeHandler{
   }
 
   createVariable(variableName){
-    this.scopes[this.scopes.length-1].createVariable(variableName);
+    let scope = this.scopes.length-1;
+    if (this.currentScope !== -1){
+      scope = this.currentScope;
+    }
+    this.scopes[scope].createVariable(variableName);
   }
 
   increaseScope(){
-    this.scopes.push(new Scope());
+    if (this.currentScope === -1) {
+      this.scopes.push(new Scope());
+    }else{
+      this.currentScope += 1
+      if (this.currentScope === this.scopes.length - 1){
+        this.currentScope = this.scopes.length - 1;
+      }
+    }
   }
 
   decreaseScope(){
-    this.scopes.pop();
+    if (this.currentScope === -1) {
+      this.scopes.pop();
+    }else{
+      this.currentScope -= 1
+      if (this.currentScope === this.scopes.length - 1){
+        this.currentScope = this.scopes.length - 1;
+      }
+    }
   }
 
 }
@@ -387,7 +424,6 @@ class CodeBlock extends Code {
       if (line instanceof ReturnStatement ) {
         return new ReturnToken(ReturnToken.Return, line.execute(context));
       }
-      //console.log(line)
       line.execute(context);
     }
     return new ReturnToken(ReturnToken.Normal);
@@ -405,6 +441,7 @@ class ReturnStatement extends Statement{
   }
 }
 
+//TODO: fix methods to have parameters
 class Method {
 
   constructor(code_block) {
@@ -416,6 +453,7 @@ class Method {
   }
 }
 
+//TODO: fix method calls to have parameters
 class MethodCall extends Statement{
 
   constructor(methodName) {
@@ -481,11 +519,13 @@ class IfStatement extends Code{
   }
 
   execute(context){
+    context.scopeHandler.increaseScope();
     if (this.conditional_statement.evaluate(context)){
       this.code_block.execute(context);
     }else if (this.else_statement){
       this.else_statement.execute(context);
     }
+    context.scopeHandler.decreaseScope();
   }
 
 }
@@ -595,6 +635,15 @@ class Tokens {
   static L_BRACKET_TOKEN = 17;
   static R_BRACKET_TOKEN = 18;
   static VARIABLE_CREATION_AND_ASSIGNMENT_TOKEN = 19;
+  static ADDITION_TOKEN = 20;
+  static SUBTRACTION_TOKEN = 21;
+  static MULTIPLICATION_TOKEN = 22;
+  static DIVISION_TOKEN = 23;
+  static ASSIGNMENT_TOKEN = 24;
+  static VARIABLE_ASSIGNMENT_TOKEN = 25;
+  static INTEGER_TOKEN = 26;
+  static PRINT_TOKEN = 27;
+  static PRINT_LINE_TOKEN = 28;
 }
 
 class TokenResponse {
@@ -684,6 +733,10 @@ TokenPattern.setPattern(Tokens.FOR_TOKEN,
   new TokenPattern(Tokens.FOR_TOKEN, /for/, 9));
 TokenPattern.setPattern(Tokens.VARIABLE_CREATION_TOKEN,
   new TokenPattern(Tokens.VARIABLE_CREATION_TOKEN, /var/, 9));
+TokenPattern.setPattern(Tokens.PRINT_TOKEN,
+  new TokenPattern(Tokens.PRINT_TOKEN, /print/, 9));
+TokenPattern.setPattern(Tokens.PRINT_LINE_TOKEN,
+  new TokenPattern(Tokens.PRINT_LINE_TOKEN, /println/, 9));
 TokenPattern.setPattern(Tokens.SPACE_TOKEN,
   new TokenPattern(Tokens.SPACE_TOKEN, / /, 11));
 TokenPattern.setPattern(Tokens.STRING_TOKEN,
@@ -698,7 +751,12 @@ TokenPattern.setPattern(Tokens.COMMENT_TOKEN,
   new TokenPattern(Tokens.COMMENT_TOKEN, /\/\/.*/, 0));
 TokenPattern.setPattern(Tokens.CATCH_TOKEN,
   new TokenPattern(Tokens.CATCH_TOKEN, /./, 999));
-
+TokenPattern.setPattern(Tokens.ASSIGNMENT_TOKEN,
+  new TokenPattern(Tokens.ASSIGNMENT_TOKEN, /=/, 2));
+TokenPattern.setPattern(Tokens.ADDITION_TOKEN,
+  new TokenPattern(Tokens.ADDITION_TOKEN, /\+/, 2));
+TokenPattern.setPattern(Tokens.INTEGER_TOKEN,
+  new TokenPattern(Tokens.INTEGER_TOKEN, /\d+/, 1));
 console.log(TokenPattern.getPattern(Tokens.IDENTITY_TOKEN));
 
 class TokenList {
@@ -725,6 +783,10 @@ class TokenList {
     for (let i = 0; i < count; i++) {
       this.tokens.pop();
     }
+  }
+
+  removeToken(distance){
+    return this.tokens.splice(this.tokens.length-1-distance, 1)[0];
   }
 
   consumeToken(){
@@ -769,11 +831,11 @@ class TokenList {
   }
 
   getTillNext(tokenType){
-    return this.getToken(this.distanceToNext(tokenType));
+    return this.getTokens(this.distanceToNext(tokenType));
   }
 
   getNext(tokenType){
-    return this.getToken(this.distanceToNext(tokenType)+1);
+    return this.getTokens(this.distanceToNext(tokenType)+1);
   }
 
   containsToken(tokenType){
@@ -821,14 +883,16 @@ class Lexer{
 }
 
 class TokenFilter{
-  static BlackList = [];
-
-  static addTokenToFilter(token_type){
-    this.BlackList.push(token_type);
+  constructor() {
+    this.blackList = [];
   }
 
-  static containsToken(token_type){
-    return this.BlackList.includes(token_type);
+  addTokenToFilter(token_type){
+    this.blackList.push(token_type);
+  }
+
+  containsToken(token_type){
+    return this.blackList.includes(token_type);
   }
 
   filter(tokens){
@@ -836,7 +900,7 @@ class TokenFilter{
     let filtered_tokens = new TokenList();
     while (tokens.hasToken(tokens)){
       const token = tokens.getToken();
-      if (!TokenFilter.BlackList.includes(token.type)){
+      if (!this.containsToken(token.type)){
         filtered_tokens.addToken(token);
       }
     }
@@ -844,8 +908,6 @@ class TokenFilter{
   }
 
 }
-
-TokenFilter.addTokenToFilter(Tokens.SPACE_TOKEN);
 
 class TokenMergePattern{
   static Patterns = new Map();
@@ -881,10 +943,21 @@ class TokenMergePattern{
 
 TokenMergePattern.setPattern(Tokens.VARIABLE_CREATION_TOKEN, (tokens, merged_tokens) => {
   const token = tokens.getToken();
-  const next_token = tokens.peek();
-  if (next_token.type === Tokens.EOL_TOKEN){
-    tokens.consumeToken();
+  const next_token = tokens.peekAhead(1);
+  if (next_token && next_token.type === Tokens.ASSIGNMENT_TOKEN){
+    tokens.removeToken(1);
     token.type = Tokens.VARIABLE_CREATION_AND_ASSIGNMENT_TOKEN;
+    token.content = [token.content, next_token.content];
+  }
+  merged_tokens.addToken(token);
+});
+
+TokenMergePattern.setPattern(Tokens.ASSIGNMENT_TOKEN, (tokens, merged_tokens) => {
+  const token = tokens.getToken();
+  const next_token = tokens.peek();
+  if (next_token && next_token.type === Tokens.ASSIGNMENT_TOKEN){
+    tokens.consumeToken();
+    token.type = Tokens.VARIABLE_ASSIGNMENT_TOKEN;
     token.content = [token.content, next_token.content];
   }
   merged_tokens.addToken(token);
@@ -904,18 +977,17 @@ class TokenMerger{
 
 class Statements{
   static BASE_STATEMENT = 0;
-  static ADDITION_STATEMENT = 1;
-  static SUBTRACTION_STATEMENT = 2;
-  static MULTIPLICATION_STATEMENT = 3;
-  static DIVISION_STATEMENT = 4;
-  static EQUAL_STATEMENT = 5;
-  static LESS_STATEMENT = 6;
-  static GREATER_STATEMENT = 7;
   static CODE_BLOCK = 10;
   static IF_BLOCK = 11;
   static ELSE_BLOCK = 12;
   static FOR_BLOCK = 13;
   static WHILE_BLOCK = 14;
+  static VARIABLE_CREATION_STATEMENT = 15;
+  static VARIABLE_ASSIGNMENT_STATEMENT = 16;
+  static VARIABLE_CREATION_ASSIGNMENT_STATEMENT = 17;
+  static EQUATION_STATEMENT = 18;
+  static PRINT_STATEMENT = 19;
+  static PRINT_LINE_STATEMENT = 20;
 }
 
 class TokenStatementMap{
@@ -935,6 +1007,18 @@ TokenStatementMap.mapToken(Tokens.IF_TOKEN, Statements.IF_BLOCK);
 TokenStatementMap.mapToken(Tokens.ELSE_TOKEN, Statements.ELSE_BLOCK);
 TokenStatementMap.mapToken(Tokens.FOR_TOKEN, Statements.FOR_BLOCK);
 TokenStatementMap.mapToken(Tokens.WHILE_TOKEN, Statements.WHILE_BLOCK);
+TokenStatementMap.mapToken(Tokens.VARIABLE_CREATION_TOKEN, Statements.VARIABLE_CREATION_STATEMENT);
+TokenStatementMap.mapToken(Tokens.VARIABLE_CREATION_AND_ASSIGNMENT_TOKEN, Statements.VARIABLE_CREATION_ASSIGNMENT_STATEMENT);
+TokenStatementMap.mapToken(Tokens.VARIABLE_ASSIGNMENT_TOKEN, Statements.VARIABLE_ASSIGNMENT_STATEMENT);
+TokenStatementMap.mapToken(Tokens.ADDITION_TOKEN, Statements.EQUATION_STATEMENT);
+TokenStatementMap.mapToken(Tokens.SUBTRACTION_TOKEN, Statements.EQUATION_STATEMENT);
+TokenStatementMap.mapToken(Tokens.MULTIPLICATION_TOKEN, Statements.EQUATION_STATEMENT);
+TokenStatementMap.mapToken(Tokens.DIVISION_TOKEN, Statements.EQUATION_STATEMENT);
+TokenStatementMap.mapToken(Tokens.IDENTITY_TOKEN, Statements.EQUATION_STATEMENT);
+TokenStatementMap.mapToken(Tokens.INTEGER_TOKEN, Statements.EQUATION_STATEMENT);
+TokenStatementMap.mapToken(Tokens.PRINT_TOKEN, Statements.PRINT_STATEMENT);
+TokenStatementMap.mapToken(Tokens.PRINT_LINE_TOKEN, Statements.PRINT_LINE_STATEMENT);
+
 
 class StatementCreators{
   static Creators = new Map();
@@ -952,13 +1036,52 @@ class StatementCreators{
   }
 }
 
-
 class StatementCreator{
 
   createStatement(tokens){
-    const statement_type = TokenStatementMap.getStatement(tokens.peek().type);
+    if (!tokens.hasToken()){
+      //TODO Add Error
+    }
+    while (tokens.hasToken() && tokens.peek().type === Tokens.EOL_TOKEN){
+      tokens.consumeToken();
+    }
+    if (!tokens.hasToken()){
+      return new Code();
+    }
+    if (debug) console.log(tokens);
+    const token_type = tokens.peek().type;
+    if (debug) console.log(token_type);
+    const statement_type = TokenStatementMap.getStatement(token_type);
+    if (debug) console.log(statement_type)
     const statement_constructor = StatementCreators.getCreator(statement_type);
-    return statement_constructor.createStatement(tokens);
+    if (debug) console.log(statement_constructor)
+    const statement = statement_constructor.createStatement(tokens);
+    return statement;
+  }
+}
+
+class VariableCreationCreator extends StatementCreator{
+
+  createStatement(tokens) {
+    tokens.consumeToken();
+    return new VariableCreation(tokens.getToken().content);
+  }
+
+}
+
+class VariableCreationAssignmentCreator extends StatementCreator{
+  createStatement(tokens) {
+    tokens.consumeToken();
+    const token = tokens.getToken();
+    return new VariableCreationAndAssignment(token.content, StatementCreators.createStatement(Statements.BASE_STATEMENT, tokens));
+  }
+}
+
+class VariableAssignmentCreator extends StatementCreator{
+
+  createStatement(tokens) {
+    const token = tokens.getToken();
+    return new VariableAssignment(token.content[0], StatementCreators.createStatement(Statements.BASE_STATEMENT, tokens));
   }
 
 }
@@ -971,11 +1094,10 @@ class CodeBlockCreator extends StatementCreator{
 
   createStatement(tokens){
     const code_block = new CodeBlock();
-    //TODO add logic to make generate lines
-    tokens.consumeToken();
     let next_token = tokens.peek()
-    while (next_token.type !== Tokens.R_BRACKET_TOKEN){
+    while (next_token && next_token.type !== Tokens.R_BRACKET_TOKEN){
       const line = this.createLine(tokens)
+      code_block.addLine(line);
       next_token = tokens.peek();
     }
     return code_block;
@@ -989,17 +1111,152 @@ class IfBlockCreator extends StatementCreator{
     //TODO: handle parenthesis and structure of if block;
     tokens.consumeNext(Tokens.L_PAREN_TOKEN);
     const condition = StatementCreators.createStatement(Statements.BASE_STATEMENT, tokens);
-    tokens.consumeTillNext(Tokens.L_BRACKET_TOKEN);
+    tokens.consumeNext(Tokens.L_BRACKET_TOKEN);
     const code_block = StatementCreators.createStatement(Statements.CODE_BLOCK, tokens);
     const if_block = new IfStatement();
   }
 
 }
 
+class EquationStatementCreator extends StatementCreator{
+
+  handleTokenType(tokens, token_type, statement){
+    if (tokens.containsToken(token_type)){
+      const before = tokens.getTillNext(token_type);
+      const token = tokens.getToken();
+      const after = tokens;
+      const constructed_statement =  new statement(StatementCreators.createStatement(Statements.BASE_STATEMENT, before), StatementCreators.createStatement(Statements.BASE_STATEMENT, after));
+      before.reverseTokens();
+      while (before.hasToken()){
+        tokens.addToken(before.getToken());
+      }
+      return constructed_statement
+    }
+  }
+
+  handleParenthesis(tokens){
+    return undefined;
+  }
+
+  handleNot(tokens){
+    return undefined;
+  }
+
+  handleMethod(tokens){
+    return undefined;
+  }
+
+  handleIdentity(tokens){
+    if (tokens.containsToken(Tokens.IDENTITY_TOKEN)){
+      const token = tokens.removeToken(tokens.distanceToNext(Tokens.IDENTITY_TOKEN));
+      return new VariableStatement(token.content);
+    }
+  }
+
+  handleInt(tokens){
+    if (tokens.containsToken(Tokens.INTEGER_TOKEN)){
+      const token = tokens.removeToken(tokens.distanceToNext(Tokens.INTEGER_TOKEN));
+      return new ValueStatement(Number.parseInt(token.content, 10));
+    }
+  }
+
+  handleValue(tokens){
+    const int = this.handleInt(tokens);
+    if (int) return int;
+  }
+
+  handleLogic(tokens){
+    return undefined;
+    const and = this.handleTokenType(tokens, Tokens.MULTIPLICATION_TOKEN, AndStatement)
+    if (and) return and;
+    const or = this.handleTokenType(tokens, Tokens.DIVISION_TOKEN, OrStatement);
+    if (or) return or;
+    const less = this.handleTokenType(tokens, Tokens.ADDITION_TOKEN, LessThanStatement);
+    if (less) return less
+    const greater =  this.handleTokenType(tokens, Tokens.SUBTRACTION_TOKEN, GreaterThanStatement);
+    if (greater) return greater;
+  }
+
+  handleArithmetic(tokens){
+    const mult = this.handleTokenType(tokens, Tokens.MULTIPLICATION_TOKEN, MultiplicationStatement)
+    if (mult) return mult;
+    const div = this.handleTokenType(tokens, Tokens.DIVISION_TOKEN, DivisionStatement);
+    if (div) return div;
+    const add = this.handleTokenType(tokens, Tokens.ADDITION_TOKEN, AdditionStatement);
+    if (add) return add;
+    const sub =  this.handleTokenType(tokens, Tokens.SUBTRACTION_TOKEN, DivisionStatement);
+    if (sub) return sub;
+  }
+
+  getStatement(tokens){
+    const method = this.handleMethod(tokens);
+    if (method) return  method;
+    const parenthesis = this.handleParenthesis(tokens);
+    if (parenthesis) return parenthesis;
+    const logic = this.handleLogic(tokens);
+    if (logic) return logic;
+    const arithmetic = this.handleArithmetic(tokens);
+    if (arithmetic) return arithmetic;
+    const not = this.handleNot(tokens);
+    if (not) return not;
+    const identity = this.handleIdentity(tokens);
+    if (identity) return identity;
+    const value = this.handleValue(tokens);
+    if (value) return value;
+  }
+
+  createStatement(tokens){
+    let equation_tokens = tokens
+    if (tokens.containsToken(Tokens.EOL_TOKEN)){
+      equation_tokens = tokens.getNext(Tokens.EOL_TOKEN);
+    }
+    const statement = this.getStatement(equation_tokens)
+    if (equation_tokens.tokens.length>0 && equation_tokens !== tokens){
+      equation_tokens.reverseTokens();
+      while (equation_tokens.hasToken()){
+        tokens.addToken(equation_tokens.getToken());
+      }
+    }
+    return statement
+  }
+
+}
+
+class PrintStatementCreator extends StatementCreator{
+
+  createStatement(tokens)  {
+    tokens.consumeToken()
+    return new Print(StatementCreators.createStatement(Statements.BASE_STATEMENT, tokens));
+  }
+
+}
+
+class PrintLineStatementCreator extends StatementCreator{
+  createStatement(tokens) {
+    tokens.consumeToken()
+    return new PrintLine(StatementCreators.createStatement(Statements.BASE_STATEMENT, tokens));
+  }
+}
+
 StatementCreators.setCreator(Statements.BASE_STATEMENT, new StatementCreator());
+StatementCreators.setCreator(Statements.CODE_BLOCK, new CodeBlockCreator());
+StatementCreators.setCreator(Statements.IF_BLOCK, new IfBlockCreator());
+StatementCreators.setCreator(Statements.VARIABLE_CREATION_STATEMENT, new VariableCreationCreator());
+StatementCreators.setCreator(Statements.VARIABLE_ASSIGNMENT_STATEMENT, new VariableAssignmentCreator());
+StatementCreators.setCreator(Statements.VARIABLE_CREATION_ASSIGNMENT_STATEMENT, new VariableCreationAssignmentCreator());
+StatementCreators.setCreator(Statements.EQUATION_STATEMENT, new EquationStatementCreator());
+StatementCreators.setCreator(Statements.PRINT_STATEMENT, new PrintStatementCreator());
+StatementCreators.setCreator(Statements.PRINT_LINE_STATEMENT, new PrintLineStatementCreator());
 
 
 class Parser {
+
+  constructor(){}
+
+  createCode(tokens){
+    tokens.reverseTokens()
+    return StatementCreators.createStatement(Statements.CODE_BLOCK, tokens);
+  }
 
 }
 
@@ -1010,25 +1267,48 @@ class Compiler {
 
 }
 
+
+
+function printTokens(tokens){
+  for (let token of tokens.tokens){
+    if (debug_token) console.log(token);
+  }
+}
+
+const pre_merge_filter = new TokenFilter();
+pre_merge_filter.addTokenToFilter(Tokens.SPACE_TOKEN);
+pre_merge_filter.addTokenToFilter(Tokens.COMMENT_TOKEN);
+
+const post_merge_filter = new TokenFilter();
+
+
 const lexer = new Lexer();
-const filter = new TokenFilter();
 const merger = new TokenMerger();
+const parser = new Parser();
+const context = new CodeContext();
+const output = new ElementOutput("output");
+context.setOutput(output);
+let tokens;
 function run(){
   const code = document.getElementById("code");
-  let tokens = lexer.tokenize(code.value);
-  for (let token of tokens.tokens){
-    console.log(token)
-  }
+  tokens = lexer.tokenize(code.value);
+  printTokens(tokens);
   console.log("Filtering")
-  let filtered_tokens = filter.filter(tokens);
-  for (let token of filtered_tokens.tokens){
-    console.log(token)
-  }
+  tokens = pre_merge_filter.filter(tokens);
+  printTokens(tokens);
   console.log("Merging")
-  let merged_tokens = merger.merge(filtered_tokens);
-  for (let token of merged_tokens.tokens){
-    console.log(token)
-  }
+  tokens = merger.merge(tokens);
+  printTokens(tokens);
+  console.log("Filtering")
+  tokens = post_merge_filter.filter(tokens);
+  printTokens(tokens);
+  console.log("Creating Code");
+  let code_block = parser.createCode(tokens);
+  console.log(code_block);
+  const line = code_block.lines[code_block.lines.length-1];
+  //code_block.lines[code_block.lines.length-1] = new PrintLine(line);
+  code_block.execute(context);
+  console.log(context);
 }
 
 document.getElementById("run").onclick = run;
