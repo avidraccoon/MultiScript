@@ -590,10 +590,11 @@ class Tokens {
   static L_PAREN_TOKEN = 12;
   static R_PAREN_TOKEN = 13;
   static COMMENT_TOKEN = 14;
-  static VARIABLE_CREATION_TOKEN = 14;
-  static CATCH_TOKEN = 15;
-  static L_BRACKET_TOKEN = 16;
-  static R_BRACKET_TOKEN = 17;
+  static VARIABLE_CREATION_TOKEN = 15;
+  static CATCH_TOKEN = 16;
+  static L_BRACKET_TOKEN = 17;
+  static R_BRACKET_TOKEN = 18;
+  static VARIABLE_CREATION_AND_ASSIGNMENT_TOKEN = 19;
 }
 
 class TokenResponse {
@@ -735,7 +736,7 @@ class TokenList {
   }
 
   peek(){
-    return this.peekAhead(1);
+    return this.peekAhead(0);
   }
 
   getToken(){
@@ -815,19 +816,43 @@ class Lexer{
       this.handleTokenGeneration(tokens, line, line_number, true);
       line_number++;
     }
-    for (let token of tokens.tokens){
-      console.log(token)
-    }
     return tokens;
   }
 }
+
+class TokenFilter{
+  static BlackList = [];
+
+  static addTokenToFilter(token_type){
+    this.BlackList.push(token_type);
+  }
+
+  static containsToken(token_type){
+    return this.BlackList.includes(token_type);
+  }
+
+  filter(tokens){
+    tokens.reverseTokens();
+    let filtered_tokens = new TokenList();
+    while (tokens.hasToken(tokens)){
+      const token = tokens.getToken();
+      if (!TokenFilter.BlackList.includes(token.type)){
+        filtered_tokens.addToken(token);
+      }
+    }
+    return filtered_tokens;
+  }
+
+}
+
+TokenFilter.addTokenToFilter(Tokens.SPACE_TOKEN);
 
 class TokenMergePattern{
   static Patterns = new Map();
   static defaultPattern = new TokenMergePattern();
 
   static setPattern(token_type, pattern){
-    this.Patterns.set(token_type, pattern);
+    this.Patterns.set(token_type, new TokenMergePattern(pattern));
   }
 
   static getPattern(token_type){
@@ -854,14 +879,26 @@ class TokenMergePattern{
   }
 }
 
+TokenMergePattern.setPattern(Tokens.VARIABLE_CREATION_TOKEN, (tokens, merged_tokens) => {
+  const token = tokens.getToken();
+  const next_token = tokens.peek();
+  if (next_token.type === Tokens.EOL_TOKEN){
+    tokens.consumeToken();
+    token.type = Tokens.VARIABLE_CREATION_AND_ASSIGNMENT_TOKEN;
+    token.content = [token.content, next_token.content];
+  }
+  merged_tokens.addToken(token);
+});
+
 class TokenMerger{
   merge(tokens){
-    tokens.reverse();
+    tokens.reverseTokens();
     let merged_tokens = new TokenList();
     while (tokens.hasToken(tokens)){
       const pattern = TokenMergePattern.getPattern(tokens.peek().type);
       pattern.merge(tokens, merged_tokens);
     }
+    return merged_tokens;
   }
 }
 
@@ -974,9 +1011,24 @@ class Compiler {
 }
 
 const lexer = new Lexer();
+const filter = new TokenFilter();
+const merger = new TokenMerger();
 function run(){
   const code = document.getElementById("code");
-  lexer.tokenize(code.value);
+  let tokens = lexer.tokenize(code.value);
+  for (let token of tokens.tokens){
+    console.log(token)
+  }
+  console.log("Filtering")
+  let filtered_tokens = filter.filter(tokens);
+  for (let token of filtered_tokens.tokens){
+    console.log(token)
+  }
+  console.log("Merging")
+  let merged_tokens = merger.merge(filtered_tokens);
+  for (let token of merged_tokens.tokens){
+    console.log(token)
+  }
 }
 
 document.getElementById("run").onclick = run;
