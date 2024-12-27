@@ -984,7 +984,7 @@ TokenMergePattern.setPattern(Tokens.VARIABLE_CREATION_TOKEN, (tokens, merged_tok
   merged_tokens.addToken(token);
 });
 
-TokenMergePattern.setPattern(Tokens.ASSIGNMENT_TOKEN, (tokens, merged_tokens) => {
+TokenMergePattern.setPattern(Tokens.IDENTITY_TOKEN, (tokens, merged_tokens) => {
   const token = tokens.getToken();
   const next_token = tokens.peek();
   if (next_token && next_token.type === Tokens.ASSIGNMENT_TOKEN){
