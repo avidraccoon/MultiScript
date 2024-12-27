@@ -1363,8 +1363,6 @@ const lexer = new Lexer();
 const merger = new TokenMerger();
 const parser = new Parser();
 const context = new CodeContext();
-const output = new ElementOutput("output");
-context.setOutput(output);
 let tokens;
 function run(){
   const code = document.getElementById("code");
@@ -1387,5 +1385,10 @@ function run(){
   code_block.execute(context);
   console.log(context);
 }
-
-document.getElementById("run").onclick = run;
+function onload(){
+  document.getElementById("code").value ="var a;\na = 1;\nvar b = 4;\nprintln a+b"
+  const output = new ElementOutput("output");
+  context.setOutput(output);
+  document.getElementById("run").onclick = run;
+}
+document.body.onload = onload;
