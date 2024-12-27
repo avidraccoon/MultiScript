@@ -39,6 +39,7 @@ class ElementOutput extends Output{
   }
 
   print(text){
+    text = text + "";
     text = text.replace("!", "\!");
     this.text += text;
     this.element.innerHTML = this.text;
@@ -110,6 +111,22 @@ class ScopeHandler{
     path.offset = offset;
     //TODO make error on not found
     return method;
+  }
+
+  getObject(fieldName) {
+    const path = this.getCurrentPath();
+    let checked = false;
+    const offset = path.offset;
+    while (!checked){
+      const variable = path.getObject().getField(fieldName);
+      if (variable) break;
+      path.backNode();
+      if (path.atStart()) checked = true;
+    }
+    const obj = path.getObject();
+    path.offset = offset;
+    //TODO make error on not found
+    return obj;
   }
 
   getVariable(fieldName) {
@@ -191,6 +208,10 @@ class CodeContext{
     this.output = output;
   }
 
+  getObject(fieldName){
+    return this.scopeHandler.getObject(fieldName);
+  }
+
   getMethod(methodName) {
     return this.scopeHandler.getMethod(methodName);
   }
@@ -266,10 +287,36 @@ class VariableStatement extends Statement{
   constructor(variableName) {
     super();
     this.variableName = variableName;
+    this.array_statements = []
   }
 
   execute(context) {
-    return new ReturnToken(ReturnToken.Normal, context.getVariable(this.variableName));
+    let value;
+    const field_seperated = this.variableName.split(/[.\[]/);
+    if (field_seperated.length > 1) {
+      const obj = context.getObject(field_seperated[0]);
+      const path = new ObjectPath(obj);
+      let array_statements_used = 0;
+      for (let i = 0; i < field_seperated.length-1; i++) {
+        let node;
+        if (field_seperated[i] === "]") {
+          node = new ObjectPathNode(ObjectPathNode.Array, this.array_statements[array_statements_used].evaluate(context));
+          array_statements_used++;
+        }else{
+          node = new ObjectPathNode(ObjectPathNode.Field, field_seperated[i]);
+        }
+        path.addNode(node);
+      }
+      const target_obj = path.getObject();
+      if (field_seperated[field_seperated.length - 1] === "]") {
+        value = target_obj.getElement(this.array_statements[array_statements_used].evaluate(context));
+      }else{
+        value = target_obj.getField(field_seperated[field_seperated.length - 1]);
+      }
+    }else{
+      value = context.getVariable(this.variableName);
+    }
+    return new ReturnToken(ReturnToken.Normal, value);
   }
 
 }
@@ -491,14 +538,39 @@ class MethodCall extends Statement{
 }
 
 class VariableAssignment extends Code{
-  constructor(variableName, statement) {
+  constructor(variableName, statement, array_statements) {
     super();
+    this.array_statements = []
     this.variableName = variableName;
     this.statement = statement;
   }
 
   execute(context) {
-    context.setVariable(this.variableName, this.statement.evaluate(context))
+    const field_seperated = this.variableName.split(/[.\[]/);
+    const value = this.statement.evaluate(context);
+    if (field_seperated.length > 1) {
+      const obj = context.getObject(field_seperated[0]);
+      const path = new ObjectPath(obj);
+      let array_statements_used = 0;
+      for (let i = 0; i < field_seperated.length-1; i++) {
+        let node;
+        if (field_seperated[i] === "]") {
+          node = new ObjectPathNode(ObjectPathNode.Array, this.array_statements[array_statements_used].evaluate(context));
+          array_statements_used++;
+        }else{
+          node = new ObjectPathNode(ObjectPathNode.Field, field_seperated[i]);
+        }
+        path.addNode(node);
+      }
+      const target_obj = path.getObject();
+      if (field_seperated[field_seperated.length - 1] === "]") {
+        target_obj.setElement(this.array_statements[array_statements_used].evaluate(context), value);
+      }else{
+        target_obj.setField(field_seperated[field_seperated.length - 1], value);
+      }
+    }else{
+      context.setVariable(this.variableName, value);
+    }
     return new ReturnToken(ReturnToken.None);
   }
 }
@@ -507,10 +579,30 @@ class VariableCreation extends Code{
   constructor(variableName) {
     super();
     this.variableName = variableName;
+    this.array_statements = []
   }
 
   execute(context) {
-    context.createVariable(this.variableName);
+    const field_seperated = this.variableName.split(/[.\[]/);
+    if (field_seperated.length > 1) {
+      const obj = context.getObject(field_seperated[0]);
+      const path = new ObjectPath(obj);
+      let array_statements_used = 0;
+      for (let i = 0; i < field_seperated.length-1; i++) {
+        let node;
+        if (field_seperated[i] === "]") {
+          node = new ObjectPathNode(ObjectPathNode.Array, this.array_statements[array_statements_used].evaluate(context));
+          array_statements_used++;
+        }else{
+          node = new ObjectPathNode(ObjectPathNode.Field, field_seperated[i]);
+        }
+        path.addNode(node);
+      }
+      const target_obj = path.getObject();
+      target_obj.createField(field_seperated[field_seperated.length - 1]);
+    }else{
+      context.createVariable(this.variableName);
+    }
     return new ReturnToken(ReturnToken.None);
   }
 }
@@ -518,13 +610,13 @@ class VariableCreation extends Code{
 class VariableCreationAndAssignment extends Code{
   constructor(variableName, statement) {
     super();
-    this.variableName = variableName;
-    this.statement = statement;
+    this.create = new VariableCreation(variableName);
+    this.assign = new VariableAssignment(variableName, statement);
   }
 
   execute(context) {
-    context.createVariable(this.variableName);
-    context.setVariable(this.variableName, this.statement.evaluate(context));
+    this.create.execute(context);
+    this.assign.execute(context);
     return new ReturnToken(ReturnToken.None);
   }
 }
@@ -674,6 +766,11 @@ class Tokens {
   static AND_TOKEN = 32;
   static OR_TOKEN = 33;
   static NOT_TOKEN = 34;
+  static BLANK_OBJECT_TOKEN = 35;
+  static BLANK_LIST_TOKEN = 36;
+  static L_SQUARE_BRACKET_TOKEN = 37;
+  static R_SQUARE_BRACKET_TOKEN = 38;
+  static FIELD_TOKEN = 39;
 }
 
 class TokenResponse {
@@ -792,6 +889,9 @@ TokenPattern.setPattern(Tokens.MULTIPLICATION_TOKEN,
 TokenPattern.setPattern(Tokens.DIVISION_TOKEN,
   new TokenPattern(Tokens.DIVISION_TOKEN, /\//, 2));
 
+TokenPattern.setPattern(Tokens.FIELD_TOKEN,
+  new TokenPattern(Tokens.FIELD_TOKEN, /\./, 2));
+
 TokenPattern.setPattern(Tokens.EQUALS_TOKEN,
   new TokenPattern(Tokens.EQUALS_TOKEN, /==/, 2));
 TokenPattern.setPattern(Tokens.GREATER_THAN_TOKEN,
@@ -809,6 +909,10 @@ TokenPattern.setPattern(Tokens.L_BRACKET_TOKEN,
   new TokenPattern(Tokens.L_BRACKET_TOKEN, /\{/, 2));
 TokenPattern.setPattern(Tokens.R_BRACKET_TOKEN,
   new TokenPattern(Tokens.R_BRACKET_TOKEN, /}/, 2));
+TokenPattern.setPattern(Tokens.L_SQUARE_BRACKET_TOKEN,
+  new TokenPattern(Tokens.L_SQUARE_BRACKET_TOKEN, /\[/, 2));
+TokenPattern.setPattern(Tokens.R_SQUARE_BRACKET_TOKEN,
+  new TokenPattern(Tokens.R_SQUARE_BRACKET_TOKEN, /]/, 2));
 TokenPattern.setPattern(Tokens.NUMBER_TOKEN,
   new TokenPattern(Tokens.NUMBER_TOKEN, /\d+/, 1));
 console.log(TokenPattern.getPattern(Tokens.IDENTITY_TOKEN));
@@ -997,18 +1101,31 @@ class TokenMergePattern{
 
 TokenMergePattern.setPattern(Tokens.VARIABLE_CREATION_TOKEN, (tokens, merged_tokens) => {
   const token = tokens.getToken();
-  const next_token = tokens.peekAhead(1);
-  if (next_token && next_token.type === Tokens.ASSIGNMENT_TOKEN){
-    tokens.removeToken(1);
-    token.type = Tokens.VARIABLE_CREATION_AND_ASSIGNMENT_TOKEN;
-    token.content = [token.content, next_token.content];
+  if (tokens.distanceToNext(Tokens.EOL_TOKEN) > tokens.distanceToNext(Tokens.ASSIGNMENT_TOKEN)){
+    const next_token = tokens.removeToken(tokens.distanceToNext(Tokens.ASSIGNMENT_TOKEN));
+    if (next_token && next_token.type === Tokens.ASSIGNMENT_TOKEN){
+      token.type = Tokens.VARIABLE_CREATION_AND_ASSIGNMENT_TOKEN;
+      token.content = [token.content, next_token.content];
+    }
   }
   merged_tokens.addToken(token);
 });
-
+//TODO update Variable Token to work with arrays and objects
 TokenMergePattern.setPattern(Tokens.IDENTITY_TOKEN, (tokens, merged_tokens) => {
   const token = tokens.getToken();
-  const next_token = tokens.peek();
+  let next_token = tokens.peek();
+  if (next_token){
+    let merging = true
+    while (merging) {
+      if (next_token.type === Tokens.FIELD_TOKEN) {
+        tokens.consumeToken();
+        token.content += next_token.content + tokens.getToken().content;
+      }else{
+        merging = false;
+      }
+      next_token = tokens.peek();
+    }
+  }
   if (next_token && next_token.type === Tokens.ASSIGNMENT_TOKEN){
     tokens.consumeToken();
     token.type = Tokens.VARIABLE_ASSIGNMENT_TOKEN;
@@ -1016,6 +1133,30 @@ TokenMergePattern.setPattern(Tokens.IDENTITY_TOKEN, (tokens, merged_tokens) => {
   }
   merged_tokens.addToken(token);
 });
+
+TokenMergePattern.setPattern(Tokens.L_SQUARE_BRACKET_TOKEN, (tokens, merged_tokens) => {
+  const token = tokens.getToken();
+  const next_token = tokens.peek();
+  if (next_token && next_token.type === Tokens.R_SQUARE_BRACKET_TOKEN){
+    tokens.consumeToken();
+    token.type = Tokens.BLANK_LIST_TOKEN;
+    token.content = token.content+next_token.content;
+  }
+  merged_tokens.addToken(token);
+});
+
+TokenMergePattern.setPattern(Tokens.L_BRACKET_TOKEN, (tokens, merged_tokens) => {
+  const token = tokens.getToken();
+  const next_token = tokens.peek();
+  if (next_token && next_token.type === Tokens.R_BRACKET_TOKEN){
+    tokens.consumeToken();
+    token.type = Tokens.BLANK_OBJECT_TOKEN;
+    token.content = token.content+next_token.content;
+  }
+  merged_tokens.addToken(token);
+});
+
+
 
 class TokenMerger{
   merge(tokens){
@@ -1085,6 +1226,8 @@ TokenStatementMap.mapToken(Tokens.NOT_TOKEN, Statements.EQUATION_STATEMENT);
 TokenStatementMap.mapToken(Tokens.PRINT_TOKEN, Statements.PRINT_STATEMENT);
 TokenStatementMap.mapToken(Tokens.PRINT_LINE_TOKEN, Statements.PRINT_LINE_STATEMENT);
 
+
+TokenStatementMap.mapToken(Tokens.BLANK_OBJECT_TOKEN, Statements.EQUATION_STATEMENT);
 
 class StatementCreators{
   static Creators = new Map();
@@ -1261,7 +1404,25 @@ class EquationStatementCreator extends StatementCreator{
     }
   }
 
+  handleBlankObject(tokens){
+    if (tokens.containsToken(Tokens.BLANK_OBJECT_TOKEN)){
+      const token = tokens.removeToken(tokens.distanceToNext(Tokens.BLANK_OBJECT_TOKEN));
+      return new ValueStatement(new BaseObject());
+    }
+  }
+
+  handleBlankArray(tokens){
+    if (tokens.containsToken(Tokens.BLANK_LIST_TOKEN)){
+      const token = tokens.removeToken(tokens.distanceToNext(Tokens.BLANK_LIST_TOKEN));
+      return new ValueStatement(new ArrayObject());
+    }
+  }
+
   handleValue(tokens){
+    const obj = this.handleBlankObject(tokens);
+    if (obj) return obj;
+    const arr = this.handleBlankArray(tokens);
+    if (arr) return arr;
     const str = this.handleString(tokens);
     if (str) return str;
     const num = this.handleNumber(tokens);
@@ -1299,7 +1460,9 @@ class EquationStatementCreator extends StatementCreator{
     if (parenthesis) return parenthesis;
     const logic = this.handleLogic(tokens);
     if (logic) return logic;
+    tokens.reverseTokens();
     const arithmetic = this.handleArithmetic(tokens);
+    tokens.reverseTokens();
     if (arithmetic) return arithmetic;
     const not = this.handleNot(tokens);
     if (not) return not;
@@ -1419,7 +1582,12 @@ function run(){
   console.log(context);
 }
 function onload(){
-  document.getElementById("code").value ="var a;\na = 1;\nvar b = 4;\nprintln a+b"
+  document.getElementById("code").value = `
+var a;
+a = {};
+var a.c = 4;
+var b = 4;
+println a.c + b`.slice(1);
   const output = new ElementOutput("output");
   context.setOutput(output);
   document.getElementById("run").onclick = run;

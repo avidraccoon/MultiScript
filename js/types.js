@@ -7,11 +7,11 @@ function registerClass(type, classObject){
 }
 
 class Types{
-  static OBJECT = 0;
-  static INT = 1;
-  static FLOAT = 2;
-  static STRING = 3;
-  static ARRAY = 4;
+  static OBJECT = "Object";
+  static INT = "Integer";
+  static FLOAT = "Float";
+  static STRING = "String";
+  static ARRAY = "Array";
 }
 
 
@@ -151,6 +151,7 @@ class BaseObject{
   }
 
   setField(fieldName, value){
+    console.log(this.fields, fieldName)
     if (this.fields.has(fieldName)) {
       this.fields.set(fieldName, value);
     } else {
@@ -167,7 +168,7 @@ class BaseObject{
   }
 
   toString(){
-    return "[ Object ]"
+    return `[object ${this.type}]`
   }
 
 
