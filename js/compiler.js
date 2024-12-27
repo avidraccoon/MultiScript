@@ -3,7 +3,14 @@
 //TODO add classes
 const debug = true;
 const debug_token = true;
+
+
+
 class Output{
+
+  constructor() {
+
+  }
 
   clear(){
     console.clear()
@@ -80,79 +87,93 @@ Potential Fix is to give methods there own scope handler and to make them extend
 class ScopeHandler{
 
   constructor(){
-    this.scopes = [new Scope()]
-    this.currentScope = -1;
+    this.baseObject = new BaseObject();
+    this.scopes = [new ObjectPath(this.baseObject)];
+  }
+
+  getCurrentPath(){
+    return this.scopes[this.scopes.length - 1];
   }
 
   getMethod(methodName) {
     let method = undefined;
-    let scope = this.scopes.length-1;
-    if (this.currentScope !== -1){
-      scope = this.currentScope;
+    let path = this.getCurrentPath();
+    let checked = false;
+    const offset = path.offset;
+    while (!checked){
+      method = path.getObject().getMethod(methodName);
+      if (method) break;
+      path.backNode();
+      if (path.atStart()) checked = true;
     }
-    for (let i=scope; i>=0; i--) {
-      method = this.scopes[i].getMethod(methodName);
-      if (method) return method;
-    }
+    path.offset = offset;
     //TODO make error on not found
     return method;
   }
 
-  getVariable(methodName) {
+  getVariable(fieldName) {
     let variable = undefined;
-    let scope = this.scopes.length-1;
-    if (this.currentScope !== -1){
-      scope = this.currentScope;
+    const path = this.getCurrentPath();
+    let checked = false;
+    const offset = path.offset;
+    while (!checked){
+      variable = path.getObject().getField(fieldName);
+      if (variable) break;
+      path.backNode();
+      if (path.atStart()) checked = true;
     }
-    for (let i=scope; i>=0; i--) {
-      variable = this.scopes[i].getVariable(methodName);
-      if (variable) return variable;
-    }
+    path.offset = offset;
     //TODO make error on not found
     return variable;
   }
 
   setVariable(variableName, variableValue) {
-    let scope = this.scopes.length-1;
-    if (this.currentScope !== -1){
-      scope = this.currentScope;
+    const path = this.getCurrentPath();
+    let checked = false;
+    const offset = path.offset;
+    while (!checked) {
+      if (path.getObject().hasField(variableName)) break;
+      path.backNode();
+      if (path.atStart()) checked = true;
     }
-    for (let i=scope; i>=0; i--) {
-      if (this.scopes[i].hasVariable(variableName)) {
-        this.scopes[i].setVariable(variableName, variableValue);
-        return;
-      }
+    if (!checked){
+      path.getObject().setField(variableName, variableValue);
     }
+    path.offset = offset;
     //TODO make error on not found
   }
 
   createVariable(variableName){
-    let scope = this.scopes.length-1;
-    if (this.currentScope !== -1){
-      scope = this.currentScope;
-    }
-    this.scopes[scope].createVariable(variableName);
+    const path = this.getCurrentPath();
+    path.getObject().createField(variableName);
   }
 
   increaseScope(){
-    if (this.currentScope === -1) {
-      this.scopes.push(new Scope());
-    }else{
-      this.currentScope += 1
-      if (this.currentScope === this.scopes.length - 1){
-        this.currentScope = this.scopes.length - 1;
+    const path = this.getCurrentPath();
+    if (path.atEnd()){
+      const current_obj = path.getObject();
+      path.addNode(new ObjectPathNode(ObjectPathNode.Field, "`scope"));
+      let obj = path.getObject();
+      if (obj === undefined){
+        obj = new ArrayObject();
+        current_obj.setField("`scope", obj);
       }
+      path.addNode(new ObjectPathNode(ObjectPathNode.Array, obj.length()));
+      obj.pushElement(new BaseObject());
+    }else{
+      path.forwardNode();
     }
   }
 
   decreaseScope(){
-    if (this.currentScope === -1) {
-      this.scopes.pop();
-    }else{
-      this.currentScope -= 1
-      if (this.currentScope === this.scopes.length - 1){
-        this.currentScope = this.scopes.length - 1;
+    path.backNode();
+    if (path.currentLength() > 1){
+      const path = this.getCurrentPath();
+      if (path.path === "`scope"){
+        const obj = path.getObject();
+        obj.popElement()
       }
+      path.backNode();
     }
   }
 
@@ -1049,6 +1070,7 @@ TokenStatementMap.mapToken(Tokens.MULTIPLICATION_TOKEN, Statements.EQUATION_STAT
 TokenStatementMap.mapToken(Tokens.DIVISION_TOKEN, Statements.EQUATION_STATEMENT);
 TokenStatementMap.mapToken(Tokens.IDENTITY_TOKEN, Statements.EQUATION_STATEMENT);
 TokenStatementMap.mapToken(Tokens.NUMBER_TOKEN, Statements.EQUATION_STATEMENT);
+TokenStatementMap.mapToken(Tokens.STRING_TOKEN, Statements.EQUATION_STATEMENT);
 TokenStatementMap.mapToken(Tokens.L_PAREN_TOKEN, Statements.EQUATION_STATEMENT);
 TokenStatementMap.mapToken(Tokens.R_PAREN_TOKEN, Statements.EQUATION_STATEMENT);
 
@@ -1223,7 +1245,15 @@ class EquationStatementCreator extends StatementCreator{
     }
   }
 
-  handleInt(tokens){
+  handleString(tokens){
+    if (tokens.containsToken(Tokens.STRING_TOKEN)){
+      const token = tokens.removeToken(tokens.distanceToNext(Tokens.STRING_TOKEN));
+      console.log(token.content);
+      return new ValueStatement(token.content);
+    }
+  }
+
+  handleNumber(tokens){
     if (tokens.containsToken(Tokens.NUMBER_TOKEN)){
       const token = tokens.removeToken(tokens.distanceToNext(Tokens.NUMBER_TOKEN));
       return new ValueStatement(Number.parseFloat(token.content));
@@ -1231,8 +1261,10 @@ class EquationStatementCreator extends StatementCreator{
   }
 
   handleValue(tokens){
-    const int = this.handleInt(tokens);
-    if (int) return int;
+    const str = this.handleString(tokens);
+    if (str) return str;
+    const num = this.handleNumber(tokens);
+    if (num) return num;
   }
 
   handleLogic(tokens){
