@@ -51,40 +51,7 @@ class ElementOutput extends Output{
 
 }
 
-class Scope{
-
-  constructor() {
-    this.variables = {};
-    this.methods = {};
-  }
-
-  setMethod(methodName, method) {
-    this.methods[methodName] = method;
-  }
-
-  getMethod(methodName) {
-    return this.methods[methodName];
-  }
-
-  setVariable(variableName, variableValue) {
-    this.variables[variableName] = variableValue;
-  }
-
-  getVariable(variableName) {
-    return this.variables[variableName];
-  }
-
-  hasVariable(variableName) {
-    return !!(this.variables[variableName] || this.variables[variableName] == null);
-  }
-
-  createVariable(name) {
-    this.variables[name] = null;
-  }
-
-}
 /*TODO redo scope handling to allow methods to work
-Potential Fix is to give methods there own scope handler and to make them extend scope
 */
 class ScopeHandler{
 
@@ -95,6 +62,10 @@ class ScopeHandler{
 
   getCurrentPath(){
     return this.scopes[this.scopes.length - 1];
+  }
+
+  setMethod(methodName, method) {
+    this.getCurrentPath().getObject().setMethod(methodName, method);
   }
 
   getMethod(methodName) {
@@ -238,6 +209,10 @@ class CodeContext{
 
   clear(){
     this.output.clear();
+  }
+
+  addMethod(methodName, method){
+    this.scopeHandler.setMethod(methodName, method);
   }
 }
 
@@ -508,32 +483,76 @@ class ReturnStatement extends Statement{
   }
 
   execute(context) {
-    return new ReturnToken(ReturnToken.Return, this.statement.execute(context).ret);
+    return new ReturnToken(ReturnToken.Return, this.statement.evaluate(context));
   }
 }
 
 //TODO: fix methods to have parameters
 class Method {
 
-  constructor(code_block) {
+  constructor(code_block, parameters = [], method_name) {
     this.code_block = code_block;
+    this.scope;
+    this.parameter_names = parameters;
+    this.method_name = method_name;
+    this.create_parameter_variables = parameters.map((parameter) => {
+      return new VariableCreation(parameter);
+    });
   }
 
   execute(context){
-    return new ReturnToken(ReturnToken.Normal, this.code_block.execute(context));
+    this.scope = context.scopeHandler.getCurrentPath().clone();
+    context.addMethod(this.method_name, this);
+  }
+
+  runMethod(context, set_parameters){
+    context.scopeHandler.scopes.push(this.scope);
+    set_parameters.map((parameter) => {
+      parameter.execute(context);
+    });
+    const ret = this.code_block.execute(context);
+    context.scopeHandler.scopes.pop();
+    return ret;
   }
 }
 
 //TODO: fix method calls to have parameters
 class MethodCall extends Statement{
 
-  constructor(methodName) {
+  constructor(methodName, parameter_statements, array_statements) {
     super();
     this.methodName = methodName;
+    this.parameter_statements = parameter_statements;
+    this.array_statements = array_statements;
   }
 
   execute(context){
-    return context.getMethod(this.methodName).execute(context);
+    let method;
+    const field_seperated = this.methodName.split(/[.\[]/);
+    if (field_seperated.length > 1) {
+      const obj = context.getObject(field_seperated[0]);
+      const path = new ObjectPath(obj);
+      let array_statements_used = 0;
+      for (let i = 0; i < field_seperated.length-1; i++) {
+        let node;
+        if (field_seperated[i] === "]") {
+          node = new ObjectPathNode(ObjectPathNode.Array, this.array_statements[array_statements_used].evaluate(context));
+          array_statements_used++;
+        }else{
+          node = new ObjectPathNode(ObjectPathNode.Field, field_seperated[i]);
+        }
+        path.addNode(node);
+      }
+      const target_obj = path.getObject();
+      method = target_obj.getMethod(field_seperated[field_seperated.length - 1]);
+    }else{
+      method = context.getMethod(this.methodName);
+    }
+    //console.log(e)
+    const parameters = this.parameter_statements.map((parameter, index) => {
+      return new VariableAssignment(method.parameter_names[index], parameter);
+    });
+    return method.runMethod(context, parameters);
   }
 }
 
@@ -771,6 +790,7 @@ class Tokens {
   static L_SQUARE_BRACKET_TOKEN = 37;
   static R_SQUARE_BRACKET_TOKEN = 38;
   static FIELD_TOKEN = 39;
+  static SEPERATOR_TOKEN = 40;
 }
 
 class TokenResponse {
@@ -850,6 +870,8 @@ TokenPattern.setPattern(Tokens.IDENTITY_TOKEN,
   new TokenPattern(Tokens.IDENTITY_TOKEN, /\w+/, 10));
 TokenPattern.setPattern(Tokens.RETURN_TOKEN,
   new TokenPattern(Tokens.RETURN_TOKEN, /return/, 9));
+TokenPattern.setPattern(Tokens.METHOD_TOKEN,
+  new TokenPattern(Tokens.METHOD_TOKEN, /method/, 9));
 TokenPattern.setPattern(Tokens.IF_TOKEN,
   new TokenPattern(Tokens.IF_TOKEN, /if/, 9));
 TokenPattern.setPattern(Tokens.ELSE_TOKEN,
@@ -891,6 +913,8 @@ TokenPattern.setPattern(Tokens.DIVISION_TOKEN,
 
 TokenPattern.setPattern(Tokens.FIELD_TOKEN,
   new TokenPattern(Tokens.FIELD_TOKEN, /\./, 2));
+TokenPattern.setPattern(Tokens.SEPERATOR_TOKEN,
+  new TokenPattern(Tokens.SEPERATOR_TOKEN, /,/, 2));
 
 TokenPattern.setPattern(Tokens.EQUALS_TOKEN,
   new TokenPattern(Tokens.EQUALS_TOKEN, /==/, 2));
@@ -1034,6 +1058,7 @@ class Lexer{
       let character_number = 1;
       let current_text = "";
       this.handleTokenGeneration(tokens, line, line_number, true);
+      if (tokens.tokens[tokens.tokens.length-1].type !== Tokens.EOL_TOKEN) tokens.addToken(new Token(Tokens.EOL_TOKEN, line_number))
       line_number++;
     }
     return tokens;
@@ -1112,11 +1137,11 @@ TokenMergePattern.setPattern(Tokens.VARIABLE_CREATION_TOKEN, (tokens, merged_tok
 });
 //TODO update Variable Token to work with arrays and objects
 TokenMergePattern.setPattern(Tokens.IDENTITY_TOKEN, (tokens, merged_tokens) => {
-  const token = tokens.getToken();
+  let token = tokens.getToken();
   let next_token = tokens.peek();
   if (next_token){
     let merging = true
-    while (merging) {
+    while (merging && next_token) {
       if (next_token.type === Tokens.FIELD_TOKEN) {
         tokens.consumeToken();
         token.content += next_token.content + tokens.getToken().content;
@@ -1126,10 +1151,16 @@ TokenMergePattern.setPattern(Tokens.IDENTITY_TOKEN, (tokens, merged_tokens) => {
       next_token = tokens.peek();
     }
   }
-  if (next_token && next_token.type === Tokens.ASSIGNMENT_TOKEN){
-    tokens.consumeToken();
-    token.type = Tokens.VARIABLE_ASSIGNMENT_TOKEN;
-    token.content = [token.content, next_token.content];
+  if (next_token){
+    if (next_token.type === Tokens.ASSIGNMENT_TOKEN){
+      tokens.consumeToken();
+      token.type = Tokens.VARIABLE_ASSIGNMENT_TOKEN;
+      token.content = [token.content, next_token.content];
+    }else if (next_token.type === Tokens.L_PAREN_TOKEN){
+      token.type = Tokens.METHOD_CALL_TOKEN;
+      merged_tokens.addToken(token);
+      token = tokens.getToken();
+    }
   }
   merged_tokens.addToken(token);
 });
@@ -1170,8 +1201,9 @@ class TokenMerger{
   }
 }
 
-class Statements{
+class Statements {
   static BASE_STATEMENT = 0;
+  static METHOD_BLOCK = 1;
   static CODE_BLOCK = 10;
   static IF_BLOCK = 11;
   static ELSE_BLOCK = 12;
@@ -1215,6 +1247,8 @@ TokenStatementMap.mapToken(Tokens.NUMBER_TOKEN, Statements.EQUATION_STATEMENT);
 TokenStatementMap.mapToken(Tokens.STRING_TOKEN, Statements.EQUATION_STATEMENT);
 TokenStatementMap.mapToken(Tokens.L_PAREN_TOKEN, Statements.EQUATION_STATEMENT);
 TokenStatementMap.mapToken(Tokens.R_PAREN_TOKEN, Statements.EQUATION_STATEMENT);
+TokenStatementMap.mapToken(Tokens.METHOD_CALL_TOKEN, Statements.EQUATION_STATEMENT);
+
 
 TokenStatementMap.mapToken(Tokens.EQUALS_TOKEN, Statements.EQUATION_STATEMENT);
 TokenStatementMap.mapToken(Tokens.LESS_THAN_TOKEN, Statements.EQUATION_STATEMENT);
@@ -1228,6 +1262,8 @@ TokenStatementMap.mapToken(Tokens.PRINT_LINE_TOKEN, Statements.PRINT_LINE_STATEM
 
 
 TokenStatementMap.mapToken(Tokens.BLANK_OBJECT_TOKEN, Statements.EQUATION_STATEMENT);
+TokenStatementMap.mapToken(Tokens.METHOD_TOKEN, Statements.METHOD_BLOCK);
+
 
 class StatementCreators{
   static Creators = new Map();
@@ -1305,8 +1341,13 @@ class CodeBlockCreator extends StatementCreator{
     const code_block = new CodeBlock();
     let next_token = tokens.peek()
     while (next_token && next_token.type !== Tokens.R_BRACKET_TOKEN){
-      const line = this.createLine(tokens)
-      code_block.addLine(line);
+      //console.log(next_token);
+      if (tokens.peek().type !== Tokens.EOL_TOKEN) {
+        const line = this.createLine(tokens);
+        code_block.addLine(line);
+      }else{
+        tokens.consumeToken();
+      }
       next_token = tokens.peek();
       console.log(code_block)
     }
@@ -1333,6 +1374,31 @@ class IfBlockCreator extends StatementCreator{
     }
     const if_block = new IfStatement(condition, code_block, else_block);
     return if_block;
+  }
+
+}
+
+class MethodBlockCreator extends StatementCreator{
+
+  createStatement(tokens){
+    //TODO: handle parenthesis and structure of if block;
+    const parameters = [];
+    tokens.consumeToken();
+    const iden = tokens.getToken();
+    tokens.consumeToken();
+    if (tokens.hasToken() && tokens.peek().type === Tokens.IDENTITY_TOKEN){
+      parameters.push(tokens.getToken().content);
+      while (tokens.hasToken() && tokens.peek().type === Tokens.SEPERATOR_TOKEN){
+        tokens.consumeToken();
+        parameters.push(tokens.getToken().content);
+      }
+    }
+    printTokens(tokens);
+    tokens.consumeTokens(2);
+    const code_block = StatementCreators.createStatement(Statements.CODE_BLOCK, tokens);
+    tokens.consumeTokens(2);
+    const method = new Method(code_block, parameters, iden.content);
+    return method;
   }
 
 }
@@ -1379,7 +1445,34 @@ class EquationStatementCreator extends StatementCreator{
   }
 
   handleMethod(tokens){
-    return undefined;
+    console.log(tokens.distanceToNext(Tokens.METHOD_CALL_TOKEN));
+    if (tokens.containsToken(Tokens.METHOD_CALL_TOKEN)){
+      const dist = tokens.distanceToNext(Tokens.METHOD_CALL_TOKEN);
+      const token = tokens.removeToken(dist);
+      tokens.removeToken(dist);
+      //const iden = tokens.getToken();
+      const ptokens = new TokenList();
+      let level = 1;
+      while (tokens.tokens.length > dist){
+        const wtoken = tokens.removeToken(dist);
+        if (wtoken.type === Tokens.L_PAREN_TOKEN){
+          level++;
+        }else if (wtoken.type === Tokens.R_PAREN_TOKEN){
+          level--;
+          if (level === 0) break;
+        }
+        ptokens.addToken(wtoken);
+      }
+      ptokens.reverseTokens();
+      const parameters = [];
+      while (ptokens.hasToken()){
+        parameters.push(StatementCreators.createStatement(Statements.BASE_STATEMENT, ptokens));
+        if (!(ptokens.hasToken() && ptokens.peek().type === Tokens.SEPERATOR_TOKEN)) break;
+      }
+      const method_call = new MethodCall(token.content, parameters);
+      console.log(method_call);
+      return method_call;
+    }
   }
 
   handleIdentity(tokens){
@@ -1520,6 +1613,7 @@ StatementCreators.setCreator(Statements.VARIABLE_CREATION_ASSIGNMENT_STATEMENT, 
 StatementCreators.setCreator(Statements.EQUATION_STATEMENT, new EquationStatementCreator());
 StatementCreators.setCreator(Statements.PRINT_STATEMENT, new PrintStatementCreator());
 StatementCreators.setCreator(Statements.PRINT_LINE_STATEMENT, new PrintLineStatementCreator());
+StatementCreators.setCreator(Statements.METHOD_BLOCK, new MethodBlockCreator());
 
 
 class Parser {

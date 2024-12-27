@@ -57,6 +57,10 @@ class ObjectPathNode{
     this.type = type;
     this.path = path
   }
+
+  clone(){
+    return new ObjectPathNode(this.type, this.path);
+  }
 }
 
 class ObjectPath{
@@ -122,6 +126,15 @@ class ObjectPath{
     return obj;
   }
 
+  clone(){
+    const path = new ObjectPathNode(this.base_object);
+    path.path = [];
+    for (let i = 0; i < this.path.length-this.offset; i++){
+      const node = this.path[i];
+      path.addNode(node.clone());
+    }
+    return path;
+  }
 
 }
 
@@ -138,8 +151,23 @@ class BaseObject{
     return other_object;
   }
 
-  getMethod(){
-    console.log("hello");
+  setMethod(methodName, method){
+    if (this.methods.has(methodName)){
+      this.methods.get(methodName).scope = undefined;
+    }
+    this.methods.set(methodName, method);
+  }
+
+  hasMethod(methodName){
+    return (this.methods.has(methodName) || this.class.static_methods.has(methodName));
+  }
+
+  getMethod(methodName){
+    if (this.methods.has(methodName)){
+      return this.methods.get(methodName);
+    }else{
+      return this.class.static_methods.get(methodName);
+    }
   }
 
   getField(fieldName){
@@ -231,8 +259,8 @@ const FloatClass = new Class(FloatObject);
 const StringClass = new Class(StringObject);
 const ArrayClass = new Class(ArrayObject);
 
-registerClass(ObjectClass);
-registerClass(IntegerClass);
-registerClass(FloatClass);
-registerClass(StringClass);
-registerClass(ArrayClass);
+registerClass(Types.OBJECT, ObjectClass);
+registerClass(Types.INT, IntegerClass);
+registerClass(Types.FLOAT, FloatClass);
+registerClass(Types.STRING, StringClass);
+registerClass(Types.ARRAY, ArrayClass);
