@@ -1,8 +1,8 @@
 //TODO add concept of objects
 //TODO add arrays
 //TODO add classes
-const debug = false;
-const debug_token = false;
+const debug = true;
+const debug_token = true;
 class Output{
 
   clear(){
@@ -326,7 +326,7 @@ class EqualsStatement extends Statement{
   }
 
   execute(context) {
-    const result = this.statement1.evaluate(context) == this.statement2.evaluate(context);
+    const result = this.statement1.evaluate(context) === this.statement2.evaluate(context);
     return new ReturnToken(ReturnToken.Normal, result);
   }
 
@@ -388,7 +388,9 @@ class OrStatement extends Statement{
   }
 
   execute(context) {
-    const result = this.statement1.evaluate(context) || this.statement2.evaluate(context);
+    const result1 = this.statement1.evaluate(context);
+    const result2 = this.statement2.evaluate(context);
+    const result = result1 || result2;
     return new ReturnToken(ReturnToken.Normal, result);
   }
 
@@ -641,9 +643,15 @@ class Tokens {
   static DIVISION_TOKEN = 23;
   static ASSIGNMENT_TOKEN = 24;
   static VARIABLE_ASSIGNMENT_TOKEN = 25;
-  static INTEGER_TOKEN = 26;
+  static NUMBER_TOKEN = 26;
   static PRINT_TOKEN = 27;
   static PRINT_LINE_TOKEN = 28;
+  static EQUALS_TOKEN = 29;
+  static LESS_THAN_TOKEN = 30;
+  static GREATER_THAN_TOKEN = 31;
+  static AND_TOKEN = 32;
+  static OR_TOKEN = 33;
+  static NOT_TOKEN = 34;
 }
 
 class TokenResponse {
@@ -755,8 +763,32 @@ TokenPattern.setPattern(Tokens.ASSIGNMENT_TOKEN,
   new TokenPattern(Tokens.ASSIGNMENT_TOKEN, /=/, 2));
 TokenPattern.setPattern(Tokens.ADDITION_TOKEN,
   new TokenPattern(Tokens.ADDITION_TOKEN, /\+/, 2));
-TokenPattern.setPattern(Tokens.INTEGER_TOKEN,
-  new TokenPattern(Tokens.INTEGER_TOKEN, /\d+/, 1));
+TokenPattern.setPattern(Tokens.SUBTRACTION_TOKEN,
+  new TokenPattern(Tokens.SUBTRACTION_TOKEN, /-/, 2));
+TokenPattern.setPattern(Tokens.MULTIPLICATION_TOKEN,
+  new TokenPattern(Tokens.MULTIPLICATION_TOKEN, /\*/, 2));
+TokenPattern.setPattern(Tokens.DIVISION_TOKEN,
+  new TokenPattern(Tokens.DIVISION_TOKEN, /\//, 2));
+
+TokenPattern.setPattern(Tokens.EQUALS_TOKEN,
+  new TokenPattern(Tokens.EQUALS_TOKEN, /==/, 2));
+TokenPattern.setPattern(Tokens.GREATER_THAN_TOKEN,
+  new TokenPattern(Tokens.GREATER_THAN_TOKEN, /</, 2));
+TokenPattern.setPattern(Tokens.LESS_THAN_TOKEN,
+  new TokenPattern(Tokens.LESS_THAN_TOKEN, />/, 2));
+TokenPattern.setPattern(Tokens.NOT_TOKEN,
+  new TokenPattern(Tokens.NOT_TOKEN, /!/, 2));
+TokenPattern.setPattern(Tokens.OR_TOKEN,
+  new TokenPattern(Tokens.OR_TOKEN, /\|\|/, 2));
+TokenPattern.setPattern(Tokens.AND_TOKEN,
+  new TokenPattern(Tokens.AND_TOKEN, /&&/, 2));
+
+TokenPattern.setPattern(Tokens.L_BRACKET_TOKEN,
+  new TokenPattern(Tokens.L_BRACKET_TOKEN, /\{/, 2));
+TokenPattern.setPattern(Tokens.R_BRACKET_TOKEN,
+  new TokenPattern(Tokens.R_BRACKET_TOKEN, /}/, 2));
+TokenPattern.setPattern(Tokens.NUMBER_TOKEN,
+  new TokenPattern(Tokens.NUMBER_TOKEN, /\d+/, 1));
 console.log(TokenPattern.getPattern(Tokens.IDENTITY_TOKEN));
 
 class TokenList {
@@ -1004,6 +1036,7 @@ class TokenStatementMap{
 }
 
 TokenStatementMap.mapToken(Tokens.IF_TOKEN, Statements.IF_BLOCK);
+TokenStatementMap.mapToken(Tokens.ELSE_IF_TOKEN, Statements.IF_BLOCK);
 TokenStatementMap.mapToken(Tokens.ELSE_TOKEN, Statements.ELSE_BLOCK);
 TokenStatementMap.mapToken(Tokens.FOR_TOKEN, Statements.FOR_BLOCK);
 TokenStatementMap.mapToken(Tokens.WHILE_TOKEN, Statements.WHILE_BLOCK);
@@ -1015,7 +1048,17 @@ TokenStatementMap.mapToken(Tokens.SUBTRACTION_TOKEN, Statements.EQUATION_STATEME
 TokenStatementMap.mapToken(Tokens.MULTIPLICATION_TOKEN, Statements.EQUATION_STATEMENT);
 TokenStatementMap.mapToken(Tokens.DIVISION_TOKEN, Statements.EQUATION_STATEMENT);
 TokenStatementMap.mapToken(Tokens.IDENTITY_TOKEN, Statements.EQUATION_STATEMENT);
-TokenStatementMap.mapToken(Tokens.INTEGER_TOKEN, Statements.EQUATION_STATEMENT);
+TokenStatementMap.mapToken(Tokens.NUMBER_TOKEN, Statements.EQUATION_STATEMENT);
+TokenStatementMap.mapToken(Tokens.L_PAREN_TOKEN, Statements.EQUATION_STATEMENT);
+TokenStatementMap.mapToken(Tokens.R_PAREN_TOKEN, Statements.EQUATION_STATEMENT);
+
+TokenStatementMap.mapToken(Tokens.EQUALS_TOKEN, Statements.EQUATION_STATEMENT);
+TokenStatementMap.mapToken(Tokens.LESS_THAN_TOKEN, Statements.EQUATION_STATEMENT);
+TokenStatementMap.mapToken(Tokens.GREATER_THAN_TOKEN, Statements.EQUATION_STATEMENT);
+TokenStatementMap.mapToken(Tokens.AND_TOKEN, Statements.EQUATION_STATEMENT);
+TokenStatementMap.mapToken(Tokens.OR_TOKEN, Statements.EQUATION_STATEMENT);
+TokenStatementMap.mapToken(Tokens.NOT_TOKEN, Statements.EQUATION_STATEMENT);
+
 TokenStatementMap.mapToken(Tokens.PRINT_TOKEN, Statements.PRINT_STATEMENT);
 TokenStatementMap.mapToken(Tokens.PRINT_LINE_TOKEN, Statements.PRINT_LINE_STATEMENT);
 
@@ -1048,7 +1091,7 @@ class StatementCreator{
     if (!tokens.hasToken()){
       return new Code();
     }
-    if (debug) console.log(tokens);
+    if (debug) printTokens(tokens);
     const token_type = tokens.peek().type;
     if (debug) console.log(token_type);
     const statement_type = TokenStatementMap.getStatement(token_type);
@@ -1099,6 +1142,7 @@ class CodeBlockCreator extends StatementCreator{
       const line = this.createLine(tokens)
       code_block.addLine(line);
       next_token = tokens.peek();
+      console.log(code_block)
     }
     return code_block;
   }
@@ -1109,11 +1153,20 @@ class IfBlockCreator extends StatementCreator{
 
   createStatement(tokens){
     //TODO: handle parenthesis and structure of if block;
-    tokens.consumeNext(Tokens.L_PAREN_TOKEN);
+    //tokens.consumeTillNext(Tokens.L_PAREN_TOKEN);
+    tokens.consumeToken();
     const condition = StatementCreators.createStatement(Statements.BASE_STATEMENT, tokens);
     tokens.consumeNext(Tokens.L_BRACKET_TOKEN);
+    console.log("test")
     const code_block = StatementCreators.createStatement(Statements.CODE_BLOCK, tokens);
-    const if_block = new IfStatement();
+    let else_block;
+    if (tokens.hasToken()){
+      if (tokens.peek().type === Tokens.ELSE_IF_TOKEN || tokens.peek().type === Tokens.ELSE_TOKEN){
+        else_block = StatementCreators.createStatement(Statements.BASE_STATEMENT, tokens);
+      }
+    }
+    const if_block = new IfStatement(condition, code_block, else_block);
+    return if_block;
   }
 
 }
@@ -1135,7 +1188,24 @@ class EquationStatementCreator extends StatementCreator{
   }
 
   handleParenthesis(tokens){
-    return undefined;
+    if (tokens.containsToken(Tokens.L_PAREN_TOKEN)){
+      let level = 1;
+      tokens.consumeToken();
+      const parenthesis_tokens = new TokenList();
+      while (level>0){
+        const token = tokens.getToken();
+        //TODO add error on no matching Parenthesis
+        if (token.type === Tokens.L_PAREN_TOKEN) {
+          level += 1;
+        }else if (token.type === Tokens.R_PAREN_TOKEN){
+          level -= 1;
+          if (level === 0) continue;
+        }
+        parenthesis_tokens.addToken(token);
+      }
+      //parenthesis_tokens.reverseTokens();
+      return StatementCreators.createStatement(Statements.BASE_STATEMENT, parenthesis_tokens);
+    }
   }
 
   handleNot(tokens){
@@ -1154,9 +1224,9 @@ class EquationStatementCreator extends StatementCreator{
   }
 
   handleInt(tokens){
-    if (tokens.containsToken(Tokens.INTEGER_TOKEN)){
-      const token = tokens.removeToken(tokens.distanceToNext(Tokens.INTEGER_TOKEN));
-      return new ValueStatement(Number.parseInt(token.content, 10));
+    if (tokens.containsToken(Tokens.NUMBER_TOKEN)){
+      const token = tokens.removeToken(tokens.distanceToNext(Tokens.NUMBER_TOKEN));
+      return new ValueStatement(Number.parseFloat(token.content));
     }
   }
 
@@ -1166,14 +1236,15 @@ class EquationStatementCreator extends StatementCreator{
   }
 
   handleLogic(tokens){
-    return undefined;
-    const and = this.handleTokenType(tokens, Tokens.MULTIPLICATION_TOKEN, AndStatement)
+    const and = this.handleTokenType(tokens, Tokens.AND_TOKEN, AndStatement)
     if (and) return and;
-    const or = this.handleTokenType(tokens, Tokens.DIVISION_TOKEN, OrStatement);
+    const or = this.handleTokenType(tokens, Tokens.OR_TOKEN, OrStatement);
     if (or) return or;
-    const less = this.handleTokenType(tokens, Tokens.ADDITION_TOKEN, LessThanStatement);
+    const equals =  this.handleTokenType(tokens, Tokens.EQUALS_TOKEN, EqualsStatement);
+    if (equals) return equals
+    const less = this.handleTokenType(tokens, Tokens.LESS_THAN_TOKEN, LessThanStatement);
     if (less) return less
-    const greater =  this.handleTokenType(tokens, Tokens.SUBTRACTION_TOKEN, GreaterThanStatement);
+    const greater =  this.handleTokenType(tokens, Tokens.GREATER_THAN_TOKEN, GreaterThanStatement);
     if (greater) return greater;
   }
 
@@ -1184,7 +1255,7 @@ class EquationStatementCreator extends StatementCreator{
     if (div) return div;
     const add = this.handleTokenType(tokens, Tokens.ADDITION_TOKEN, AdditionStatement);
     if (add) return add;
-    const sub =  this.handleTokenType(tokens, Tokens.SUBTRACTION_TOKEN, DivisionStatement);
+    const sub =  this.handleTokenType(tokens, Tokens.SUBTRACTION_TOKEN, SubtractionStatement);
     if (sub) return sub;
   }
 
@@ -1209,8 +1280,14 @@ class EquationStatementCreator extends StatementCreator{
     let equation_tokens = tokens
     if (tokens.containsToken(Tokens.EOL_TOKEN)){
       equation_tokens = tokens.getNext(Tokens.EOL_TOKEN);
+    }else if (tokens.containsToken(Tokens.L_BRACKET_TOKEN)){
+      equation_tokens = tokens.getNext(Tokens.L_BRACKET_TOKEN);
+    }else if (tokens.containsToken(Tokens.R_BRACKET_TOKEN)){
+      equation_tokens = tokens.getNext(Tokens.R_BRACKET_TOKEN);
     }
+    equation_tokens.reverseTokens();
     const statement = this.getStatement(equation_tokens)
+    equation_tokens.reverseTokens();
     if (equation_tokens.tokens.length>0 && equation_tokens !== tokens){
       equation_tokens.reverseTokens();
       while (equation_tokens.hasToken()){

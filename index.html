@@ -25,8 +25,42 @@
 <body>
 
   <!-- Add your site or application content here -->
-  <p>Hello world! This is HTML5 Boilerplate.</p>
+  <p>Welcome to my custom (A programming language developed for this poject) runner. Currently, it only has basic features
+  but in the future I am planning on making it have graphics capabilities and more.</p>
 
+  <table>
+    <tr>
+      <th>Implemented Feature</th>
+      <th>Planned Features</th>
+    </tr>
+    <tr>
+      <td>
+        <ul>
+          <li>Variables</li>
+          <li>Arithmatic Operators (+, -, /, *)</li>
+          <li>Logical Operators (==, <, >, ||, &&)</li>
+          <li>console output</li>
+          <li>If statements</li>
+
+        </ul>
+      </td>
+      <td>
+        <ul>
+          <li>Add remaining logical Operator (!, <=, >=, !=)</li>
+          <li>Arrays</li>
+          <li>Classes</li>
+          <li>Objects</li>
+          <li>Graphics</li>
+          <li>Input</li>
+          <li>Else statements</li>
+          <li>Compiling to Javascript</li>
+          <li>For loops</li>
+          <li>While Loops</li>
+        </ul>
+      </td>
+    </tr>
+  </table>
+  <p>Scroll down to view programming guide</p>
   <button id="run">Run</button>
   </br>
   <div id="lang">
@@ -36,12 +70,27 @@
     </span>
     <span>
       <p>Output</p>
-      </br>
       <textarea id="output" rows="30px" cols="50px" ></textarea>
     </span>
     <script src="js/compiler.js"></script>
     <script src="js/app.js"></script>
   </div>
+
+  <p>To create a variable called &lt;variable name> do.<br><code>var &lt;variable name></code><br>
+  To set the value of a variable do.<br><code>&lt;variable name> = &lt;value></code><br>
+    You also can create and assign a variable at the same time<br><code>var &lt;variable name> = &lt;value></code></p>
+
+  <br>
+  <p>Here are a few examples</p>
+  <code>//Printing a + b Outputs 10<br>var a = 3;<br>var b = 7;<br>println a + b;</code><br>
+  <br>
+  <code>
+    //If statement Outputs 12<br>
+    var a = 3; var b = 4;<br>
+    if (a < b) {<br>
+    &nbsp;&nbsp;println a*b<br>
+    }
+  </code>
 </body>
 
 </html>

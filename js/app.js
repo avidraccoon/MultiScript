@@ -41,4 +41,4 @@ codeBlock.addLine(endValuePrint);
 //codeBlock.execute(context);
 //console.log(context.getVariable("test"));
 
-document.getElementById("code").value ="var test = 0;\nvar test1 = 1;\nprintln test + test1;"
+document.getElementById("code").value ="var a = 1; var b = 4;\nif (a < b){\n  println a+b\n}"
