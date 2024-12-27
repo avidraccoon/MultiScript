@@ -39,6 +39,7 @@ class ElementOutput extends Output{
   }
 
   print(text){
+    text = text.replace("!", "\!");
     this.text += text;
     this.element.innerHTML = this.text;
   }
@@ -1249,7 +1250,7 @@ class EquationStatementCreator extends StatementCreator{
     if (tokens.containsToken(Tokens.STRING_TOKEN)){
       const token = tokens.removeToken(tokens.distanceToNext(Tokens.STRING_TOKEN));
       console.log(token.content);
-      return new ValueStatement(token.content);
+      return new ValueStatement(token.content.slice(1, token.content.length-1));
     }
   }
 
