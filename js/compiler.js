@@ -489,9 +489,10 @@ class ReturnStatement extends Statement{
 }
 
 //TODO: fix methods to have parameters
-class Method {
+class Method extends BaseObject{
 
   constructor(code_block, parameters = [], method_name) {
+    super();
     this.code_block = code_block;
     this.scope;
     this.parameter_names = parameters;
@@ -551,11 +552,11 @@ class MethodCall extends Statement{
         path.addNode(node);
       }
       const target_obj = path.getObject();
-      method = target_obj.getMethod(field_seperated[field_seperated.length - 1]);
+      method = target_obj.getField(field_seperated[field_seperated.length - 1]);
     }else{
-      method = context.getMethod(this.methodName);
+      method = context.getVariable(this.methodName);
     }
-    //console.log(e)
+    console.log(method)
     const parameters = this.parameter_statements.map((parameter, index) => {
       return new VariableAssignment(method.parameter_names[index], parameter);
     });

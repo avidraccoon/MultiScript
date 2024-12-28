@@ -152,10 +152,11 @@ class BaseObject{
   }
 
   setMethod(methodName, method){
-    if (this.methods.has(methodName)){
+    /*if (this.methods.has(methodName)){
       this.methods.get(methodName).scope = undefined;
     }
-    this.methods.set(methodName, method);
+    this.methods.set(methodName, method);*/
+    this.setField(methodName, method);
   }
 
   hasMethod(methodName){
@@ -163,11 +164,12 @@ class BaseObject{
   }
 
   getMethod(methodName){
-    if (this.methods.has(methodName)){
+    this.getField(methodName)
+    /*if (this.methods.has(methodName)){
       return this.methods.get(methodName);
     }else{
       return this.class.static_methods.get(methodName);
-    }
+    }*/
   }
 
   getField(fieldName){
