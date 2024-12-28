@@ -34,15 +34,15 @@ class ElementOutput extends Output{
   }
 
   clear(){
-    this.element.innerText = '';
+    this.element.value = '';
     this.text = '';
   }
 
   print(text){
     text = text + "";
     text = text.replace("!", "\!");
-    this.text += text;
-    this.element.innerHTML = this.text;
+    //this.text += text;
+    this.element.value += text;
   }
 
   println(text){
@@ -155,6 +155,7 @@ class ScopeHandler{
   }
 
   decreaseScope(){
+    const path = this.getCurrentPath();
     path.backNode();
     if (path.currentLength() > 1){
       const path = this.getCurrentPath();
@@ -507,10 +508,16 @@ class Method {
 
   runMethod(context, set_parameters){
     context.scopeHandler.scopes.push(this.scope);
+    context.scopeHandler.increaseScope();
+    this.create_parameter_variables.map((parameter) => {
+      parameter.execute(context);
+    });
     set_parameters.map((parameter) => {
       parameter.execute(context);
     });
+    console.log(context.scopeHandler.getCurrentPath().getObject());
     const ret = this.code_block.execute(context);
+    context.scopeHandler.decreaseScope();
     context.scopeHandler.scopes.pop();
     return ret;
   }
@@ -1463,11 +1470,16 @@ class EquationStatementCreator extends StatementCreator{
         }
         ptokens.addToken(wtoken);
       }
-      ptokens.reverseTokens();
+      //ptokens.reverseTokens();
+      //printTokens(ptokens)
       const parameters = [];
       while (ptokens.hasToken()){
         parameters.push(StatementCreators.createStatement(Statements.BASE_STATEMENT, ptokens));
+        //printTokens(ptokens)
+        ptokens.reverseTokens();
+        //console.log("s", ptokens.hasToken(), ptokens.peek().type === Tokens.SEPERATOR_TOKEN, ptokens.peek().type)
         if (!(ptokens.hasToken() && ptokens.peek().type === Tokens.SEPERATOR_TOKEN)) break;
+        ptokens.consumeToken();
       }
       const method_call = new MethodCall(token.content, parameters);
       console.log(method_call);

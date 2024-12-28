@@ -127,7 +127,7 @@ class ObjectPath{
   }
 
   clone(){
-    const path = new ObjectPathNode(this.base_object);
+    const path = new ObjectPath(this.base_object);
     path.path = [];
     for (let i = 0; i < this.path.length-this.offset; i++){
       const node = this.path[i];
