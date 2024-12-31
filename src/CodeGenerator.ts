@@ -1,8 +1,0 @@
-
-class CodeGenerator {
-
-}
-
-class Code{
-
-}

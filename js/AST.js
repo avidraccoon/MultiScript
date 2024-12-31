@@ -1,11 +1,31 @@
 "use strict";
-class Line {
+class SyntaxCode {
+    generateCode(codeGenerator) {
+    }
 }
-class Expression {
+class Expression extends SyntaxCode {
+}
+class Line extends SyntaxCode {
+    constructor(expression) {
+        super();
+        this.expression = expression;
+    }
+    generateCode(codeGenerator) {
+        this.expression.generateCode(codeGenerator);
+        codeGenerator.endLine();
+    }
+}
+class CodeBlock extends SyntaxCode {
     constructor() {
+        super();
+        this.lines = [];
     }
-    generateCode() {
+    addLine(line) {
+        this.lines.push(line);
     }
-    interpret() {
+    generateCode(codeGenerator) {
+        for (let line of this.lines) {
+            line.generateCode(codeGenerator);
+        }
     }
 }

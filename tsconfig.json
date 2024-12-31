@@ -1,7 +1,8 @@
 {
 
-  "include": ["src"],
+  "include": ["ts"],
   "compilerOptions": {
+    "rootDir": "./ts",
     "outDir": "./js",
     /* Visit https://aka.ms/tsconfig to read more about this file */
 

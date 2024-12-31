@@ -25,8 +25,8 @@
 <body>
 
   <!-- Add your site or application content here -->
-  <p>Welcome to my custom TwinScript(A programming language developed for this project) runner. It is named this because it will be able to run interpreted or be compiled to JavaScript.<br>
-    Currently, it only has basic features and can only be run interpreted.</p>
+  <p>Welcome to my custom MultiScript(A programming language developed for this project) compiler. It is named this because it will be able to be compiled to many different languages.<br>
+    Currently, it only has basic features and can only be compiled to Javascript</p>
 
   <table>
     <tr>
@@ -38,24 +38,23 @@
         <ul>
           <li>Variables</li>
           <li>Arithmatic Operators (+, -, /, *)</li>
-          <li>Logical Operators (==, <, >, ||, &&)</li>
+          <li>Logical Operators (==, <, >, ||, &&, !, <=, >=, !=)</li>
           <li>console output</li>
-          <li>If statements</li>
-          <li>Objects</li>
-          <li>Methods</li>
+          <li>If and else statements</li>
+          <li>For loops</li>
+          <li>While Loops</li>
+          <li>Functions</li>
         </ul>
       </td>
       <td>
         <ul>
-          <li>&Add remaining logical Operator (!, <=, >=, !=)</li>
+          <li>Objects</li>
           <li>Arrays</li>
           <li>Classes</li>
           <li>Graphics</li>
           <li>Input</li>
-          <li>&Else statements</li>
           <li>Compiling to Javascript</li>
-          <li>For loops</li>
-          <li>&While Loops</li>
+          <li>Compiling to Python</li>
         </ul>
       </td>
     </tr>
@@ -72,11 +71,11 @@
       <p>Output</p>
       <textarea id="output" rows="30px" cols="50px" ></textarea>
     </span>
-    <script src="js/CodeGenerator.js"></script>
+    <script src="js/CustomImplementation.js"></script>
     <script src="js/AST.js"></script>
-    <script src="js/types.js"></script>
-    <script src="js/compiler.js"></script>
-    <script src="js/app.js"></script>
+    <script src="js/Parser.js"></script>
+    <script src="js/CodeGenerator.js"></script>
+    <script src="js/Test.js"></script>
   </div>
 
   <p>To create a variable called &lt;variable name> do.<br><code>var &lt;variable name></code><br>
