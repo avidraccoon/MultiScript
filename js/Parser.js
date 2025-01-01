@@ -33,6 +33,8 @@ const TokenizerSpecs = [
     { expression: /^\{/, type: "BRACKET_OPEN" },
     { expression: /^}/, type: "BRACKET_CLOSE" },
     { expression: /^!/, type: "NOT" },
+    { expression: /^=/, type: "ASSIGNMENT" },
+    { expression: /^,/, type: "COMMA" },
     //Types
     { expression: /^int/, type: 'TYPE' },
     { expression: /^float/, type: 'TYPE' },
@@ -69,6 +71,7 @@ class Tokenizer {
             return null;
         }
         const cur_string = this._string.slice(this._cursor);
+        console.log(cur_string);
         for (const spec of TokenizerSpecs) {
             const tokenValue = this._match(spec.expression, cur_string);
             //Don't match this rule, continue.
@@ -126,7 +129,7 @@ class CodeParser {
             lines.push(this.Line());
         }
         return {
-            type: "lines",
+            type: "Lines",
             body: lines
         };
     }
@@ -144,11 +147,14 @@ class CodeParser {
         else if (this._lookahead.type == "FUNCTION") {
             return this.FunctionDefinition();
         }
+        else if (this._lookahead.type == "TYPE") {
+            return this.VariableCreation();
+        }
         else {
             statement = this.ExpressionStatement();
         }
         return {
-            type: "line",
+            type: "Line",
             statement: statement
         };
     }
@@ -217,6 +223,7 @@ class CodeParser {
         };
     }
     ExpressionStatement() {
+        console.log(this._lookahead, "look");
         const expression = this.Expression();
         this._eat('SEP');
         return {
@@ -306,21 +313,21 @@ class CodeParser {
         this._eat("PAREN_CLOSE");
         return {
             type: "Parentheses",
-            value: value
+            inner: value
         };
     }
     NOT() {
         this._eat("NOT");
         return {
             type: "Not",
-            value: this.Primary()
+            inner: this.Primary()
         };
     }
     NEGATE() {
         this._eat("ADDITIVE_OPERATOR");
         return {
             type: "Negate",
-            value: this.Primary()
+            inner: this.Primary()
         };
     }
     VariableDeclaration() {
@@ -337,7 +344,7 @@ class CodeParser {
     FunctionDefinition() {
         var _a, _b;
         this._eat("FUNCTION");
-        const name = this._eat("IDENTIFIER");
+        const name = this._eat("IDENTIFIER").value;
         const params = [];
         this._eat("PAREN_OPEN");
         while (((_a = this._lookahead) === null || _a === void 0 ? void 0 : _a.type) != "PAREN_CLOSE") {
@@ -358,10 +365,13 @@ class CodeParser {
         };
     }
     Identifier() {
-        var _a;
+        var _a, _b;
         const variable = this.Variable();
         if (((_a = this._lookahead) === null || _a === void 0 ? void 0 : _a.type) == "PAREN_OPEN") {
             return this.FunctionCall(variable);
+        }
+        if (variable.member_access == undefined && ((_b = this._lookahead) === null || _b === void 0 ? void 0 : _b.type) == "ASSIGNMENT") {
+            return this.VariableAssignment(variable);
         }
         return variable;
     }
@@ -382,15 +392,6 @@ class CodeParser {
             parameters: parameters
         };
     }
-    MemberAccess(origin) {
-        this._eat("PERIOD");
-        const member = this._eat("IDENTIFIER");
-        return {
-            type: "MemberAccess",
-            origin: origin,
-            member: member.value
-        };
-    }
     Variable() {
         var _a;
         let type = "Variable";
@@ -403,8 +404,34 @@ class CodeParser {
         }
         return {
             type: type,
-            value: identifier,
+            value: identifier.value,
             member_access: member_access
+        };
+    }
+    VariableCreation() {
+        var _a;
+        const declaration = this.VariableDeclaration();
+        let assignment;
+        if (((_a = this._lookahead) === null || _a === void 0 ? void 0 : _a.type) == "ASSIGNMENT") {
+            this._eat("ASSIGNMENT");
+            assignment = this.ExpressionStatement();
+        }
+        else {
+            this._eat("SEP");
+        }
+        return {
+            type: "VariableCreation",
+            declaration: declaration,
+            assignment: assignment
+        };
+    }
+    VariableAssignment(variable) {
+        this._eat("ASSIGNMENT");
+        const expression = this.Expression();
+        return {
+            type: "VariableAssignment",
+            variable: variable,
+            value: expression
         };
     }
     Literal() {

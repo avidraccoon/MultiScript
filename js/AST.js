@@ -12,7 +12,7 @@ class Line extends SyntaxCode {
     }
     generateCode(codeGenerator) {
         this.expression.generateCode(codeGenerator);
-        codeGenerator.endLine();
+        //codeGenerator.endLine();
     }
 }
 class CodeBlock extends SyntaxCode {

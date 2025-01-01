@@ -1,7 +1,7 @@
 
 class SyntaxCode{
 
-  public generateCode(codeGenerator: CodeGenerator){
+  public generateCode(codeGenerator: LanguageCodeGenerator){
 
   }
 
@@ -18,9 +18,9 @@ class Line extends SyntaxCode{
     this.expression = expression;
   }
 
-  generateCode(codeGenerator: CodeGenerator){
+  generateCode(codeGenerator: LanguageCodeGenerator){
     this.expression.generateCode(codeGenerator);
-    codeGenerator.endLine();
+    //codeGenerator.endLine();
   }
 
 }
@@ -36,7 +36,7 @@ class CodeBlock extends SyntaxCode{
     this.lines.push(line);
   }
 
-  generateCode(codeGenerator: CodeGenerator){
+  generateCode(codeGenerator: LanguageCodeGenerator){
     for (let line of this.lines) {
       line.generateCode(codeGenerator);
     }

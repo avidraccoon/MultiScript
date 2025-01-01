@@ -1,5 +1,5 @@
 "use strict";
-class CodeGenerator {
+class LanguageCodeGenerator {
     constructor() {
         this.generatedCode = "";
         this.customImplementationUsage = new CustomImplementationUsage();
@@ -24,6 +24,7 @@ class CodeGenerator {
         this.newLine();
     }
     handleWriting(code) {
+        console.log(code);
         switch (code.type) {
             case "Program":
                 this.handleWriting(code.body);
@@ -118,7 +119,18 @@ class CodeGenerator {
                 break;
             case "NumericLiteral":
             case "StringLiteral":
-                this.writeElse(code.value);
+                this.writeCode(code.value);
+                break;
+            case "VariableCreation":
+                if (code.assignment) {
+                    this.writeVariableCreationAndAssignment(code);
+                }
+                else {
+                    this.writeVariableCreation(code);
+                }
+                break;
+            case "VariableAssignment":
+                this.writeVariableAssignment(code);
                 break;
         }
     }
@@ -193,6 +205,12 @@ class CodeGenerator {
         // @ts-ignore
         this.handleWriting(code.inner);
     }
+    writeVariableCreation(code) {
+    }
+    writeVariableAssignment(code) {
+    }
+    writeVariableCreationAndAssignment(code) {
+    }
     writeCode(text) {
         this.generatedCode += text;
     }
@@ -223,19 +241,50 @@ class CodeGenerator {
         this.customImplementations += this.customImplementationUsage.useCustomImplemtation(implementation);
     }
 }
-class JavaScriptCodeGenerator extends CodeGenerator {
+class JavaScriptCodeGenerator extends LanguageCodeGenerator {
     generateCode(parsed_code) {
         this.customImplementationUsage = new CustomImplementationUsage();
         return super.generateCode(parsed_code);
     }
     writeFunction(_function) {
         this.writeCode(`function ${_function.name}(`);
+        for (let i = 0; i < _function.parameters.length; i++) {
+            const param = _function.parameters[i];
+            if (i != 0) {
+                this.writeCode(", ");
+            }
+            this.writeCode(param.name);
+        }
         //TODO handle parameters
         this.writeCode(") {");
+        this.increaseIndent();
         this.newLine();
-        //TODO write code
+        this.handleWriting(_function.code);
+        this.decreaseIndent();
+        this.newLine();
         this.writeCode("}");
         this.newLine();
+    }
+    writeVariableCreation(code) {
+        this.writeCode("let ");
+        // @ts-ignore
+        this.writeCode(code.declaration.name);
+        this.writeEndLine();
+    }
+    writeVariableAssignment(code) {
+        // @ts-ignore
+        this.handleWriting(code.variable);
+        this.writeCode(" = ");
+        // @ts-ignore
+        this.handleWriting(code.value);
+    }
+    writeVariableCreationAndAssignment(code) {
+        this.writeCode("let ");
+        // @ts-ignore
+        this.writeCode(code.declaration.name);
+        this.writeCode(" = ");
+        // @ts-ignore
+        this.handleWriting(code.assignment);
     }
 }
 class GeneratedCode {
