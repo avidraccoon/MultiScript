@@ -1,17 +1,30 @@
 "use strict";
-const ADDITION_IMPLEMENTATION = ``;
-const MATH_IMPLEMENTATION = ``;
-var CustomImplementations;
-(function (CustomImplementations) {
-    CustomImplementations[CustomImplementations["ADDITION"] = 0] = "ADDITION";
-    CustomImplementations[CustomImplementations["MATH_FUNCTIONS"] = 1] = "MATH_FUNCTIONS";
-})(CustomImplementations || (CustomImplementations = {}));
-const CustomImplementationsCode = new Map();
-CustomImplementationsCode.set(CustomImplementations.ADDITION, ADDITION_IMPLEMENTATION);
-CustomImplementationsCode.set(CustomImplementations.MATH_FUNCTIONS, MATH_IMPLEMENTATION);
+//TODO Clean up
+//TODO write documentation
+//JavaScript
+const JAVASCRIPT_ADDITION_IMPLEMENTATION = `
+function fixed_javascript_add(a, b){
+  if (a instanceof Array) {
+    if (b instanceof Array) {
+      return a.concat(b);
+    }
+  }
+  return a + b;
+}
+`;
+const JAVASCRIPT_MATH_IMPLEMENTATION = ``;
+var JavaScriptCustomImplementations;
+(function (JavaScriptCustomImplementations) {
+    JavaScriptCustomImplementations[JavaScriptCustomImplementations["ADDITION"] = 0] = "ADDITION";
+    JavaScriptCustomImplementations[JavaScriptCustomImplementations["MATH_FUNCTIONS"] = 1] = "MATH_FUNCTIONS";
+})(JavaScriptCustomImplementations || (JavaScriptCustomImplementations = {}));
+const JavaScriptCustomImplementationsCode = new Map();
+JavaScriptCustomImplementationsCode.set(JavaScriptCustomImplementations.ADDITION, JAVASCRIPT_ADDITION_IMPLEMENTATION);
+JavaScriptCustomImplementationsCode.set(JavaScriptCustomImplementations.MATH_FUNCTIONS, JAVASCRIPT_MATH_IMPLEMENTATION);
 class CustomImplementationUsage {
-    constructor() {
+    constructor(customImplementations) {
         this.usedImplementations = new Map();
+        this.customImplementations = customImplementations;
     }
     hasUsedImplementation(implementation) {
         return this.usedImplementations.has(implementation);
@@ -19,7 +32,7 @@ class CustomImplementationUsage {
     useCustomImplemtation(implementation) {
         if (!this.hasUsedImplementation(implementation)) {
             this.usedImplementations.set(implementation, true);
-            return CustomImplementationsCode.get(implementation);
+            return this.customImplementations.get(implementation);
         }
         return "";
     }

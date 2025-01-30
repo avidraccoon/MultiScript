@@ -1,0 +1,76 @@
+//TODO implment marcos, lambda, annotation, target
+
+//For python method overloading use
+@multipledispatch
+
+
+
+
+
+
+-------------------------------------------------------------------- (Raw MultiScript)
+
+macro log(string message) {
+  @target("python") {
+    print(message)
+  }
+  @target("javascript"){
+    console.log(message);
+  }
+}
+
+marco ifPython(function fun) {
+  @target("python"){
+    fun()
+  }
+}
+
+var function test = lambda void test(){
+  #log("Hello World!");
+}
+
+#ifPython(test);
+
+-------------------------------------------------------------------- (Processed MultiScript)
+
+var function test = lambda void test(){
+  {
+    var string message = "Hello World!";
+    @target("python") {
+      print(message)
+    }
+    @target("javascript) {
+      console.log(message);
+    }
+  }
+}
+
+{
+  var function fun = test;
+  @target("python") {
+    fun()
+  }
+}
+
+-------------------------------------------------------------------- (Python)
+
+def __create_lambda():
+  def __increase_scope():
+    message = "Hello World!"
+    print(message)
+  __increase_scope()
+test = __create_lambda()
+
+def __increase_scope():
+  fun = test
+  fun()
+__increase_scope()
+
+-------------------------------------------------------------------- (JavaScript)
+
+let test = () => {
+  {
+    let message = "Hello World!"
+    console.log(message);
+  }
+}

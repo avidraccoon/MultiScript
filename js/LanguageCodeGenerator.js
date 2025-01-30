@@ -1,8 +1,10 @@
 "use strict";
+//TODO write documentation
 class LanguageCodeGenerator {
     constructor() {
         this.generatedCode = "";
-        this.customImplementationUsage = new CustomImplementationUsage();
+        // @ts-ignore
+        this.customImplementationUsage = new CustomImplementationUsage(undefined);
         this.customImplementations = "";
         this.indentation = 0;
     }
@@ -34,9 +36,6 @@ class LanguageCodeGenerator {
                     this.handleWriting(line);
                 }
                 break;
-            case "Line":
-                this.handleWriting(code.statement);
-                break;
             case "SINGLE_LINE_IF":
                 this.writeSingleIf(code);
                 break;
@@ -60,46 +59,44 @@ class LanguageCodeGenerator {
                 this.writeEndLine();
                 break;
             case "BinaryExpression":
-                this.handleWriting(code.left);
                 switch (code.operator) {
                     case "==":
-                        this.writeEquals();
+                        this.writeEquals(code);
                         break;
                     case "!=":
-                        this.writeNotEquals();
+                        this.writeNotEquals(code);
                         break;
                     case "<=":
-                        this.writeLessEquals();
+                        this.writeLessEquals(code);
                         break;
                     case ">=":
-                        this.writeGreaterEquals();
+                        this.writeGreaterEquals(code);
                         break;
                     case "<":
-                        this.writeLess();
+                        this.writeLess(code);
                         break;
                     case ">":
-                        this.writeGreater();
+                        this.writeGreater(code);
                         break;
                     case "||":
-                        this.writeOr();
+                        this.writeOr(code);
                         break;
                     case "&&":
-                        this.writeAnd();
+                        this.writeAnd(code);
                         break;
                     case "+":
-                        this.writePlus();
+                        this.writePlus(code);
                         break;
                     case "-":
-                        this.writeMinus();
+                        this.writeMinus(code);
                         break;
                     case "*":
-                        this.writeMultiply();
+                        this.writeMultiply(code);
                         break;
                     case "/":
-                        this.writeDivide();
+                        this.writeDivide(code);
                         break;
                 }
-                this.handleWriting(code.right);
                 break;
             case "Negate":
                 this.writeNegate(code);
@@ -117,9 +114,15 @@ class LanguageCodeGenerator {
             case "MemberAccess":
                 this.handleVariable(code);
                 break;
-            case "NumericLiteral":
-            case "StringLiteral":
+            case "IntegerLiteral":
+            case "FloatLiteral":
                 this.writeCode(code.value);
+                break;
+            case "BooleanLiteral":
+                this.writeBoolean(code);
+                break;
+            case "StringLiteral":
+                this.writeString(code);
                 break;
             case "VariableCreation":
                 if (code.assignment) {
@@ -132,6 +135,57 @@ class LanguageCodeGenerator {
             case "VariableAssignment":
                 this.writeVariableAssignment(code);
                 break;
+            case "Return":
+                this.writeReturn(code);
+                break;
+            case "FunctionCall":
+                this.writeFunctionCall(code);
+                break;
+            case "Print":
+                this.writePrint(code);
+                break;
+            case "Println":
+                this.writePrintln(code);
+                break;
+        }
+    }
+    writeBoolean(code) {
+        if (code.value) {
+            this.writeCode("true");
+        }
+        else {
+            this.writeCode("false");
+        }
+    }
+    writeString(code) {
+        this.writeCode(`"${code.value}"`);
+    }
+    writePrint(code) {
+    }
+    writePrintln(code) {
+    }
+    writeFunctionCall(code) {
+        this.writeVariable(code.variable);
+        console.log(code);
+        this.writeCode("(");
+        for (let i = 0; i < code.parameters.length; i++) {
+            const param = code.parameters[i];
+            if (i != 0) {
+                this.writeCode(", ");
+            }
+            this.handleWriting(param);
+        }
+        this.writeCode(")");
+    }
+    writeReturn(code) {
+        this.writeCode("return ");
+        // @ts-ignore
+        if (code.value) {
+            // @ts-ignore
+            this.handleWriting(code.value);
+        }
+        else {
+            this.writeEndLine();
         }
     }
     handleVariable(code) {
@@ -153,46 +207,96 @@ class LanguageCodeGenerator {
         // @ts-ignore
         this.writeCode(`${code.value}.`);
     }
-    writeEquals() {
+    writeEquals(code) {
+        // @ts-ignore
+        this.handleWriting(code.left);
         this.writeCode("==");
+        // @ts-ignore
+        this.handleWriting(code.right);
     }
-    writeNotEquals() {
+    writeNotEquals(code) {
+        // @ts-ignore
+        this.handleWriting(code.left);
         this.writeCode("!=");
+        // @ts-ignore
+        this.handleWriting(code.right);
     }
-    writeLessEquals() {
+    writeLessEquals(code) {
+        // @ts-ignore
+        this.handleWriting(code.left);
         this.writeCode("<=");
+        // @ts-ignore
+        this.handleWriting(code.right);
     }
-    writeGreaterEquals() {
+    writeGreaterEquals(code) {
+        // @ts-ignore
+        this.handleWriting(code.left);
         this.writeCode(">=");
+        // @ts-ignore
+        this.handleWriting(code.right);
     }
-    writeLess() {
+    writeLess(code) {
+        // @ts-ignore
+        this.handleWriting(code.left);
         this.writeCode("<");
+        // @ts-ignore
+        this.handleWriting(code.right);
     }
-    writeGreater() {
+    writeGreater(code) {
+        // @ts-ignore
+        this.handleWriting(code.left);
         this.writeCode(">");
+        // @ts-ignore
+        this.handleWriting(code.right);
     }
-    writeAnd() {
+    writeAnd(code) {
+        // @ts-ignore
+        this.handleWriting(code.left);
         this.writeCode("&&");
+        // @ts-ignore
+        this.handleWriting(code.right);
     }
-    writeOr() {
+    writeOr(code) {
+        // @ts-ignore
+        this.handleWriting(code.left);
         this.writeCode("||");
+        // @ts-ignore
+        this.handleWriting(code.right);
     }
-    writePlus() {
+    writePlus(code) {
+        // @ts-ignore
+        this.handleWriting(code.left);
         this.writeCode("+");
+        // @ts-ignore
+        this.handleWriting(code.right);
     }
-    writeMinus() {
+    writeMinus(code) {
+        // @ts-ignore
+        this.handleWriting(code.left);
         this.writeCode("-");
+        // @ts-ignore
+        this.handleWriting(code.right);
     }
     writeNegate(code) {
-        this.writeMinus();
+        this.writeCode("-");
         // @ts-ignore
         this.handleWriting(code.inner);
+        // @ts-ignore
+        this.handleWriting(code.right);
     }
-    writeMultiply() {
+    writeMultiply(code) {
+        // @ts-ignore
+        this.handleWriting(code.left);
         this.writeCode("*");
+        // @ts-ignore
+        this.handleWriting(code.right);
     }
-    writeDivide() {
+    writeDivide(code) {
+        // @ts-ignore
+        this.handleWriting(code.left);
         this.writeCode("/");
+        // @ts-ignore
+        this.handleWriting(code.right);
     }
     writeParentheses(code) {
         this.writeCode("(");
@@ -242,8 +346,12 @@ class LanguageCodeGenerator {
     }
 }
 class JavaScriptCodeGenerator extends LanguageCodeGenerator {
+    constructor(useFixesForWeirdness = true) {
+        super();
+        this._useFixesForWeirdness = useFixesForWeirdness;
+    }
     generateCode(parsed_code) {
-        this.customImplementationUsage = new CustomImplementationUsage();
+        this.customImplementationUsage = new CustomImplementationUsage(JavaScriptCustomImplementationsCode);
         return super.generateCode(parsed_code);
     }
     writeFunction(_function) {
@@ -265,6 +373,21 @@ class JavaScriptCodeGenerator extends LanguageCodeGenerator {
         this.writeCode("}");
         this.newLine();
     }
+    writePlus(code) {
+        if (this._useFixesForWeirdness) {
+            this.useCustomImplementation(JavaScriptCustomImplementations.ADDITION);
+            this.writeCode("fixed_javascript_add(");
+            // @ts-ignore
+            this.handleWriting(code.left);
+            this.writeCode(", ");
+            // @ts-ignore
+            this.handleWriting(code.right);
+            this.writeCode(")");
+        }
+        else {
+            super.writePlus(code);
+        }
+    }
     writeVariableCreation(code) {
         this.writeCode("let ");
         // @ts-ignore
@@ -285,6 +408,20 @@ class JavaScriptCodeGenerator extends LanguageCodeGenerator {
         this.writeCode(" = ");
         // @ts-ignore
         this.handleWriting(code.assignment);
+    }
+    writeComment(message) {
+        this.writeCode("//" + message);
+        this.writeEndLine();
+    }
+    writePrint(code) {
+        this.writeComment("Print without new line not possible in Browser JavaScript");
+        this.writePrintln(code);
+    }
+    writePrintln(code) {
+        this.writeCode("console.log(");
+        this.handleWriting(code.value);
+        this.writeCode(")");
+        this.writeEndLine();
     }
 }
 class GeneratedCode {

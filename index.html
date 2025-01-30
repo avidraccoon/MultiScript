@@ -39,22 +39,28 @@
           <li>Variables</li>
           <li>Arithmatic Operators (+, -, /, *)</li>
           <li>Logical Operators (==, <, >, ||, &&, !, <=, >=, !=)</li>
-          <li>console output</li>
           <li>If and else statements</li>
-          <li>While Loops</li>
           <li>Functions</li>
+          <li>Basic type checking</li>
+          <li>Printing</li>
         </ul>
       </td>
       <td>
         <ul>
+          <li>Remove Comments</li>
           <li>Objects</li>
+          <li>While Loops</li>
           <li>Arrays</li>
           <li>Classes</li>
-          <li>Graphics</li>
-          <li>Input</li>
+          <li>Output</li>
           <li>Compiling to Javascript</li>
           <li>Compiling to Python</li>
           <li>For loops</li>
+          <li>Better Error Handling</li>
+          <li>Member access</li>
+          <li>More complete semantic analysis</li>
+          <li>marcos</li>
+          <li>Language targeted code</li>
         </ul>
       </td>
     </tr>
@@ -63,6 +69,12 @@
   <button id="run">Run</button>
   </br>
   <div id="lang">
+    <label for="langauge">Choose a target langauge:</label>
+    <select id="langauge" name="langauge">
+      <option value="javascript">Javascript</option>
+      <option value="python">Python</option>
+      <option value="c">C</option>
+    </select>
     <span>
       <p>Code</p>
       <textarea id="code" rows="30px" cols="75px" ></textarea>
@@ -71,8 +83,8 @@
       <p>Output</p>
       <textarea id="output" rows="30px" cols="50px" ></textarea>
     </span>
+    <script src="js/SemanticAnalyzer.js"></script>
     <script src="js/CustomImplementation.js"></script>
-    <script src="js/AST.js"></script>
     <script src="js/Parser.js"></script>
     <script src="js/LanguageCodeGenerator.js"></script>
     <script src="js/Test.js"></script>
@@ -84,31 +96,28 @@
 
   <br>
   <p>Here are a few examples</p>
-  <code>//Printing a + b Outputs 10<br>var a = 3;<br>var b = 7;<br>println a + b;</code>
+  <code>//Printing a + b Outputs 10<br>var int a = 3;<br>var int b = 7;<br>println a + b;</code>
   <br><br>
   <code>
     //If statement Outputs 12<br>
-    var a = 3; var b = 4;<br>
+    var int a = 3; var int b = 4;<br>
     if (a < b) {<br>
     &nbsp;&nbsp;println a*b<br>
     }
   </code>
-  <br><br>
-  <code>
-    //Objects also exist Outputs 8
-    var a;<br>
-    a = {};<br>
-    var a.c = 4;<br>
-    var b = 4;<br>
-    println a.c + b
+  <p>Strings</p>
+  <code>//Printing "Hello World!"<br>
+    var string message = "Hello World!";<br>
+    println "Hello World!";<br>
+    println message;
   </code>
   <br><br>
   <code>
-    //Methods also work //Outputs Hello World<br>
-    method a(){<br>
-    &nbsp;&nbsp;println "Hello World"<br>
+    //Methods also work //Method returns 5<br>
+    func int add(int a, int b){<br>
+    &nbsp;&nbsp;return a + b;<br>
     }<br>
-    a()
+    a(3, 2);
   </code>
 </body>
 
