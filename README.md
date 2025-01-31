@@ -2,6 +2,14 @@
 A language made to be able to be compiled to many other langauges.
 ## Tutorial
 
+## Links to examples
+
+### Linked to Repository
+https://avidraccoon.github.io/MultiScript/
+
+### Updated when on versions (Currently out of date)
+https://multiscript.avidraccoon5.hackclub.app/
+
 ### Creating a variable
 To create a variable you can enter
 ```
@@ -110,6 +118,5 @@ In another tab still in the MultiScript directory run
 ```bash
 tsc --watch
 ```
-
 ### Notes
 If you want feel free to add on or to create a suggestion in an issue.
