@@ -39,8 +39,8 @@ const TokenizerSpecs: Spec[] = [
   {expression: /^\/\*[\s\S]*?\*\//, type: null},
 
   //Numbers
-  {expression: /^\d+/, type: 'INTEGER'},
-  {expression: /^\d+.\d*/, type: 'FLOAT'},
+  {expression: /^-?\d+/, type: 'INTEGER'},
+  {expression: /^-?\d+.\d*/, type: 'FLOAT'},
 
 
   //Strings
@@ -62,6 +62,8 @@ const TokenizerSpecs: Spec[] = [
   {expression: /^lambda/, type: "LAMBDA"},
   {expression: /^println/, type: "PRINTLN"},
   {expression: /^print/, type: "PRINT"},
+  {expression: /^@target/, type: "TARGET"},
+  {expression: /^macro/, type: "MACRO"},
 
   //Operators
   {expression: /^((&&)|(\|\|))/, type: "ANDOR_OPERATOR"},
@@ -78,8 +80,7 @@ const TokenizerSpecs: Spec[] = [
   {expression: /^!/, type: "NOT"},
   {expression: /^=/, type: "ASSIGNMENT"},
   {expression: /^,/, type: "COMMA"},
-  {expression: /^@/, type: "annotation"},
-  {expression: /^#/, type: "call"},
+  {expression: /^#/, type: "MACRO_CALL"},
 
 
 
@@ -162,6 +163,7 @@ class CodeParser{
   private id: number = 0;
   private tokenizer: Tokenizer;
   private _lookahead: Token | null = {type: "", value: ""};
+  private macros: any[] = [];
 
   public constructor(tokenizer: Tokenizer | undefined) {
     if (tokenizer) {
@@ -204,7 +206,8 @@ class CodeParser{
   Lines(){
     const lines = [];
     while (!this.tokenizer.isEOF() && this._lookahead?.type != "BRACKET_CLOSE") {
-      lines.push(this.Line());
+      let line = this.Line()
+      if (line) lines.push(line);
     }
     return {
       type: "Lines",
@@ -218,9 +221,9 @@ class CodeParser{
       throw new Error("Expected Token");
     }
     if (this._lookahead.type == "IF") {
-      statement = this.If();
+      return this.If();
     }else if (this._lookahead.type == "WHILE") {
-      statement = this.While();
+      return this.While();
     }else if (this._lookahead.type == "FUNCTION"){
       return this.FunctionDefinition();
     }else if (this._lookahead.type == "VARIABLE"){
@@ -231,9 +234,55 @@ class CodeParser{
       return this.Print()
     }else if (this._lookahead.type == "PRINTLN"){
       return this.Println();
-    } else{
+    }else if (this._lookahead.type == "MACRO") {
+      return this.Macro();
+    }else if (this._lookahead.type == "TARGET") {
+      return this.Target();
+    }else if (this._lookahead.type == "MACRO_CALL") {
+      return this.MacroCall();
+    }else{
       return this.ExpressionStatement();
     }
+  }
+
+  Target() {
+    this._eat("TARGET");
+    this._eat("PAREN_OPEN");
+    const target: string = this._eat("STRING").value.slice(1, -1);
+    this._eat("PAREN_CLOSE");
+    return {
+      type: "Target",
+      target,
+      line: this.Line()
+    }
+  }
+
+  Macro() {
+    this._eat("MACRO");
+    const name = this._eat("IDENTIFIER").value;
+    this._eat("BRACKET_OPEN");
+    const code = this.Lines();
+    this._eat("BRACKET_CLOSE");
+    this.macros.push({
+      name,
+      code
+    });
+  }
+
+  getMacro(name: string): {name: string, code: object} {
+    for (let i = 0; i< this.macros.length; i++){
+      if (this.macros[i].name == name){
+        return this.macros[i];
+      }
+    }
+    return <{ name: string, code: object }><unknown>"Fail";
+  }
+
+  MacroCall() {
+    this._eat("MACRO_CALL");
+    const name = this._eat("IDENTIFIER").value;
+    const macro = this.getMacro(name);
+    return macro.code;
   }
 
   Print() {
@@ -319,6 +368,7 @@ class CodeParser{
     this._eat('WHILE');
     let code;
     let type = "SINGLE_LINE_WHILE";
+    let condition = this.Paren();
     if (this._lookahead?.type == "BRACKET_OPEN"){
       type = "MULTI_LINE_WHILE";
       this._eat('BRACKET_OPEN');
@@ -330,7 +380,8 @@ class CodeParser{
     return {
       type: type,
       body: code,
-      id: this.id++
+      id: this.id++,
+      condition: condition
     }
   }
 

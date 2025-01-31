@@ -6,14 +6,51 @@ class LanguageCodeGenerator {
   protected customImplementationUsage: CustomImplementationUsage = new CustomImplementationUsage(undefined);
   protected customImplementations: string = "";
   protected indentation: number = 0;
+  protected start_identation: number = 2;
+  protected writeToGlobal: boolean = true
+  protected writeToClass: boolean = true
+  protected writeToFunction: boolean = true
+  protected mainClass: string = "class Main {\n  ";
+  protected mainFunction: string = "  void main(){\n    ";
+  protected inMainClass: boolean = true;
+  protected inMainFunction: boolean = true;
+  protected _function: string = "";
+  protected _class: string = "";
+  protected _end: string = " \n  }\n}";
+  protected language: string = "none";
 
-  public constructor() {}
+  public constructor() {
+
+  }
+
+  public startFunction(){
+    this.writeToFunction = true;
+    if (this.inMainFunction){
+      this.indentation = this.start_identation-1;
+    }
+    this.inMainFunction = false;
+  }
+
+  public endFunction(){
+    this.writeToFunction = false;
+    this.writeCode(this._function);
+    this._function = "";
+    if (this.writeToClass){
+      this.writeToFunction = true;
+    }
+    if (this.inMainClass){
+      this.writeToFunction = true;
+      this.inMainFunction = true;
+      this.indentation = this.start_identation;
+    }
+  }
 
   public generateCode(parsed_code: Object): GeneratedCode{
     this.generatedCode = "";
     this.customImplementations = "";
-    this.indentation = 0;
+    this.indentation = this.start_identation;
     this.handleWriting(parsed_code);
+    this.generatedCode+=this.mainClass+"\n"+this.mainFunction+this._end;
     return new GeneratedCode(this.customImplementations+this.generatedCode);
   }
 
@@ -33,11 +70,15 @@ class LanguageCodeGenerator {
   public handleWriting(code: any){
     console.log(code)
     switch (code.type) {
+      case "Target":
+        if (this.language == code.target) this.handleWriting(code.line);
+        break;
       case "Program":
         this.handleWriting(code.body);
         break;
       case "Lines":
         for (let line of code.body){
+          console.log(line);
           this.handleWriting(line);
         }
         break;
@@ -113,7 +154,9 @@ class LanguageCodeGenerator {
         this.writeParentheses(code);
         break;
       case "FunctionDefinition":
+        this.startFunction();
         this.writeFunction(code);
+        this.endFunction();
         break;
       case "Variable":
       case "MemberAccess":
@@ -333,7 +376,19 @@ class LanguageCodeGenerator {
   }
 
   public writeCode(text: string): void{
-    this.generatedCode += text;
+    if (this.inMainFunction){
+      this.mainFunction += text;
+    }else if (this.inMainClass) {
+      this.mainClass += text;
+    }else if (this.writeToFunction){
+      this._function += text;
+    }else if (this.writeToClass){
+      this._class += text;
+    }else if (this.writeToGlobal){
+      this.generatedCode += text;
+    }else{
+      this.generatedCode += text;
+    }
   }
 
   public newLine(): void {
@@ -376,6 +431,8 @@ class JavaScriptCodeGenerator extends LanguageCodeGenerator {
   constructor(useFixesForWeirdness: boolean = true) {
     super();
     this._useFixesForWeirdness = useFixesForWeirdness;
+    this.mainFunction = "  function main(){\n    "
+    this.language = "javascript"
   }
 
   public generateCode(parsed_code: Object): GeneratedCode {
@@ -457,6 +514,251 @@ class JavaScriptCodeGenerator extends LanguageCodeGenerator {
     this.handleWriting(code.value);
     this.writeCode(")");
     this.writeEndLine();
+  }
+
+  public writeWhile(_while: any) {
+    this.writeCode("while ");
+    this.handleWriting(_while.condition);
+    this.writeCode(" {");
+    this.increaseIndent();
+    this.newLine();
+    this.handleWriting(_while.body);
+    this.decreaseIndent();
+    this.newLine();
+    this.writeCode("}");
+    this.newLine();
+  }
+
+  public writeIf(_if: any) {
+    this.writeCode("if ");
+    this.handleWriting(_if.condition);
+    this.writeCode(" {");
+    this.increaseIndent();
+    this.newLine();
+    this.handleWriting(_if.body);
+    this.decreaseIndent();
+    this.newLine();
+    this.writeCode("}");
+    this.newLine();
+  }
+}
+
+class PythonCodeGenerator extends LanguageCodeGenerator {
+
+  constructor() {
+    super();
+    this.mainClass = "class Main:\n  "
+    this.mainFunction = "  def main():\n    "
+    this._end = ""
+    this.language = "python"
+  }
+
+  public generateCode(parsed_code: Object): GeneratedCode {
+    return super.generateCode(parsed_code);
+  }
+
+  public writeEndLine(){
+    this.newLine();
+  }
+
+  public writeFunction(_function: any){
+    this.writeCode(`def ${_function.name}(`);
+    for (let i = 0; i<_function.parameters.length; i++){
+      const param = _function.parameters[i];
+      if (i != 0){
+        this.writeCode(", ");
+      }
+      this.writeCode(param.name);
+    }
+    //TODO handle parameters
+    this.writeCode("):");
+    this.increaseIndent();
+    this.newLine();
+    this.handleWriting(_function.code);
+    this.decreaseIndent();
+    this.newLine();
+  }
+
+  public writePlus(code: Object){
+    super.writePlus(code);
+  }
+
+  public writeVariableCreation(code: Object) {
+    // @ts-ignore
+    this.writeCode(code.declaration.name);
+    this.writeCode(" = None");
+    this.writeEndLine();
+  }
+
+  public writeVariableAssignment(code: Object) {
+    // @ts-ignore
+    this.handleWriting(code.variable);
+    this.writeCode(" = ");
+    // @ts-ignore
+    this.handleWriting(code.value);
+  }
+
+  public writeVariableCreationAndAssignment(code: Object){
+    // @ts-ignore
+    this.writeCode(code.declaration.name);
+    this.writeCode(" = ");
+    // @ts-ignore
+    this.handleWriting(code.assignment);
+  }
+
+  public writeComment(message:string){
+    this.writeCode("#" + message);
+    this.writeEndLine();
+  }
+
+  public writePrint(code: Object) {
+    this.writeCode("print(");
+    this.handleWriting(code.value);
+    this.writeCode(", end = '')");
+    this.writeEndLine();
+  }
+
+  public writePrintln(code: Object) {
+    this.writeCode("print(");
+    this.handleWriting(code.value);
+    this.writeCode(")");
+    this.writeEndLine();
+  }
+
+  public writeWhile(_while: any) {
+    this.writeCode("while ");
+    this.handleWriting(_while.condition);
+    this.writeCode(":");
+    this.increaseIndent();
+    this.newLine();
+    this.handleWriting(_while.body);
+    this.decreaseIndent();
+    this.newLine();
+  }
+
+  public writeIf(_if: any) {
+    this.writeCode("if ");
+    this.handleWriting(_if.condition);
+    this.writeCode(":");
+    this.increaseIndent();
+    this.newLine();
+    this.handleWriting(_if.body);
+    this.decreaseIndent();
+    this.newLine();
+  }
+}
+
+class CCodeGenerator extends LanguageCodeGenerator {
+
+  constructor() {
+    super();
+    this.mainClass = "";
+    this.start_identation = 1;
+    this.mainFunction = "void main(){\n  "
+    this._end = "\n}"
+    this.language = "c"
+  }
+
+  public generateCode(parsed_code: Object): GeneratedCode {
+    return super.generateCode(parsed_code);
+  }
+
+  public writeFunction(_function: any){
+    this.writeCode(_function.return_type.value);
+    this.writeCode(` ${_function.name}(`);
+    for (let i = 0; i<_function.parameters.length; i++){
+      const param = _function.parameters[i];
+      if (i != 0){
+        this.writeCode(", ");
+      }
+      this.writeCode(param.name);
+    }
+    //TODO handle parameters
+    this.writeCode(") {");
+    this.increaseIndent();
+    this.newLine();
+    this.handleWriting(_function.code);
+    this.decreaseIndent();
+    this.newLine();
+    this.writeCode("}");
+    this.newLine();
+  }
+
+  public writePlus(code: Object){
+    super.writePlus(code);
+  }
+
+  public writeVariableCreation(code: Object) {
+    // @ts-ignore
+    this.writeCode(code.declaration.type);
+    this.writeCode(" ");
+    // @ts-ignore
+    this.writeCode(code.declaration.name);
+    this.writeEndLine();
+  }
+
+  public writeVariableAssignment(code: Object) {
+    // @ts-ignore
+    this.handleWriting(code.variable);
+    this.writeCode(" = ");
+    // @ts-ignore
+    this.handleWriting(code.value);
+  }
+
+  public writeVariableCreationAndAssignment(code: Object){
+    this.writeCode("let ");
+    // @ts-ignore
+    this.writeCode(code.declaration.name);
+    this.writeCode(" = ");
+    // @ts-ignore
+    this.handleWriting(code.assignment);
+  }
+
+  public writeComment(message:string){
+    this.writeCode("//" + message);
+    this.writeEndLine();
+  }
+
+  public writePrint(code: Object) {
+    this.writeCode("printf(");
+    this.handleWriting(code.value);
+    this.writeCode(")");
+    this.writeEndLine();
+  }
+
+  public writePrintln(code: Object) {
+    this.writeCode("printf(");
+    this.handleWriting(code.value);
+    this.writeCode(")");
+    this.writeEndLine();
+    this.writeCode("printf('\\n')");
+    this.writeEndLine();
+  }
+
+  public writeWhile(_while: any) {
+    this.writeCode("while ");
+    this.handleWriting(_while.condition);
+    this.writeCode(" {");
+    this.increaseIndent();
+    this.newLine();
+    this.handleWriting(_while.body);
+    this.decreaseIndent();
+    this.newLine();
+    this.writeCode("}");
+    this.newLine();
+  }
+
+  public writeIf(_if: any) {
+    this.writeCode("if ");
+    this.handleWriting(_if.condition);
+    this.writeCode(" {");
+    this.increaseIndent();
+    this.newLine();
+    this.handleWriting(_if.body);
+    this.decreaseIndent();
+    this.newLine();
+    this.writeCode("}");
+    this.newLine();
   }
 }
 

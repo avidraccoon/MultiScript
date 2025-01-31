@@ -41,40 +41,44 @@
           <li>Logical Operators (==, <, >, ||, &&, !, <=, >=, !=)</li>
           <li>If and else statements</li>
           <li>Functions</li>
-          <li>Basic type checking</li>
           <li>Printing</li>
+          <li>Compiling to Javascript</li>
+          <li>Compiling to Python</li>
+          <li>Compiling to C</li>
+          <li>While Loops</li>
+          <li>/Macros</li>
+          <li>/Language targeted code</li>
         </ul>
       </td>
       <td>
         <ul>
-          <li>Remove Comments</li>
+          <li>/Remove console log</li>
+          <li>/Better Error Handling</li>
+          <li>/?(1:1)struct</li>
+          <li>/?(1:2)Arrays</li>
           <li>Objects</li>
-          <li>While Loops</li>
-          <li>Arrays</li>
           <li>Classes</li>
-          <li>Output</li>
-          <li>Compiling to Javascript</li>
-          <li>Compiling to Python</li>
           <li>For loops</li>
-          <li>Better Error Handling</li>
           <li>Member access</li>
           <li>More complete semantic analysis</li>
-          <li>marcos</li>
-          <li>Language targeted code</li>
+          <li>Add Type Checking (Partially implemented but not enabled)</li>
+          <li>Valid code checking (Partially implemented but not enabled)</li>
         </ul>
       </td>
     </tr>
   </table>
   <p>Scroll down to view programming guide</p>
-  <button id="run">Run</button>
+  <label for="langauge">Choose a target langauge:</label>
+  <select id="langauge" name="langauge">
+    <option value="C">C</option>
+    <option value="Python">Python</option>
+    <option value="Javascript">Javascript</option>
+  </select>
+  <button id="run">Compile</button>
   </br>
+
   <div id="lang">
-    <label for="langauge">Choose a target langauge:</label>
-    <select id="langauge" name="langauge">
-      <option value="javascript">Javascript</option>
-      <option value="python">Python</option>
-      <option value="c">C</option>
-    </select>
+
     <span>
       <p>Code</p>
       <textarea id="code" rows="30px" cols="75px" ></textarea>
