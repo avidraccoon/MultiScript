@@ -59,7 +59,7 @@ class LanguageCodeGenerator {
         this.newLine();
     }
     handleWriting(code) {
-        console.log(code);
+        //console.log(code)
         switch (code.type) {
             case "Target":
                 if (this.language == code.target)
@@ -70,7 +70,7 @@ class LanguageCodeGenerator {
                 break;
             case "Lines":
                 for (let line of code.body) {
-                    console.log(line);
+                    //console.log(line);
                     this.handleWriting(line);
                 }
                 break;
@@ -206,7 +206,7 @@ class LanguageCodeGenerator {
     }
     writeFunctionCall(code) {
         this.writeVariable(code.variable);
-        console.log(code);
+        //console.log(code)
         this.writeCode("(");
         for (let i = 0; i < code.parameters.length; i++) {
             const param = code.parameters[i];

@@ -86,7 +86,7 @@ class Tokenizer {
             return null;
         }
         const cur_string = this._string.slice(this._cursor);
-        console.log(cur_string);
+        //console.log(cur_string)
         for (const spec of TokenizerSpecs) {
             const tokenValue = this._match(spec.expression, cur_string);
             //Don't match this rule, continue.
@@ -186,6 +186,9 @@ class CodeParser {
         }
         else if (this._lookahead.type == "MACRO_CALL") {
             return this.MacroCall();
+        }
+        else if (this._lookahead.type == "BRACKET_OPEN") {
+            return this.Lines();
         }
         else {
             return this.ExpressionStatement();
@@ -330,7 +333,7 @@ class CodeParser {
         };
     }
     ExpressionStatement() {
-        console.log(this._lookahead, "look");
+        //console.log(this._lookahead, "look")
         const expression = this.Expression();
         this._eat('SEP');
         return {
