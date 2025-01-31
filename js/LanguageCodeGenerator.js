@@ -506,6 +506,17 @@ class JavaScriptCodeGenerator extends LanguageCodeGenerator {
         this.writeCode("}");
         this.newLine();
     }
+    writeElse(_if) {
+        this.writeCode("else ");
+        this.writeCode(" {");
+        this.increaseIndent();
+        this.newLine();
+        this.handleWriting(_if.body);
+        this.decreaseIndent();
+        this.newLine();
+        this.writeCode("}");
+        this.newLine();
+    }
 }
 class PythonCodeGenerator extends LanguageCodeGenerator {
     constructor() {
@@ -591,6 +602,14 @@ class PythonCodeGenerator extends LanguageCodeGenerator {
         this.writeCode("if ");
         this.handleWriting(_if.condition);
         this.writeCode(":");
+        this.increaseIndent();
+        this.newLine();
+        this.handleWriting(_if.body);
+        this.decreaseIndent();
+        this.newLine();
+    }
+    writeElse(_if) {
+        this.writeCode("else :");
         this.increaseIndent();
         this.newLine();
         this.handleWriting(_if.body);
@@ -689,6 +708,17 @@ class CCodeGenerator extends LanguageCodeGenerator {
     writeIf(_if) {
         this.writeCode("if ");
         this.handleWriting(_if.condition);
+        this.writeCode(" {");
+        this.increaseIndent();
+        this.newLine();
+        this.handleWriting(_if.body);
+        this.decreaseIndent();
+        this.newLine();
+        this.writeCode("}");
+        this.newLine();
+    }
+    writeElse(_if) {
+        this.writeCode("else ");
         this.writeCode(" {");
         this.increaseIndent();
         this.newLine();
