@@ -123,6 +123,20 @@
     }<br>
     a(3, 2);
   </code>
+  <br><br>
+  <code>
+    //Python only code<br>
+    @target("python") println "Hello World!";
+  </code>
+  <br><br>
+  <code>
+    //Macros inject code into where they are used<br>
+    macro example{<br>
+    &nbsp;println test;<br>
+    }<br>
+    var string test = "Hello";<br>
+    #example
+  </code>
 </body>
 
 </html>
