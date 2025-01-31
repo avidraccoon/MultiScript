@@ -91,7 +91,7 @@ while (a>0){
 
 ## Use it for yourself
 
-### How to run (Has not been tested)
+### How to run
 ```bash
 git clone https://github.com/avidraccoon/MultiScript.git
 cd MultiScript
@@ -99,7 +99,7 @@ npm install
 npm start
 ``` 
 
-### How to edit (Has not been tested)
+### How to edit
 ```bash
 git clone https://github.com/avidraccoon/MultiScript.git
 cd MultiScript
@@ -110,3 +110,6 @@ In another tab still in the MultiScript directory run
 ```bash
 tsc --watch
 ```
+
+### Notes
+If you want feel free to add on or to create a suggestion in an issue.
